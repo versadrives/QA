@@ -36,9 +36,14 @@ jobs:
           --hidden-import socketio
           --hidden-import engineio
           --hidden-import eventlet
-          --hidden-import gevent
+          --hidden-import eventlet.green.socket
+          --hidden-import eventlet.hubs
+          --hidden-import eventlet.hubs.epolls
+          --hidden-import eventlet.hubs.kqueue
+          --hidden-import eventlet.hubs.selects
+          --hidden-import eventlet.hubs.poll
+          --hidden-import eventlet.support.greenlets
           run_app.py
-
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4

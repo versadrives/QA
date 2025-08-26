@@ -8,7 +8,6 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -22,7 +21,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # Ensure dnspython v2+ for Eventlet greendns and openpyxl for Excel export
           pip install "dnspython>=2.3.0" openpyxl
 
       - name: Build with PyInstaller
@@ -49,6 +47,7 @@ jobs:
             --hidden-import eventlet.hubs.kqueue `
             --hidden-import eventlet.hubs.selects `
             --hidden-import eventlet.hubs.poll `
+            --hidden-import engineio.async_drivers.eventlet `
             --hidden-import dns `
             --hidden-import dns.asyncquery `
             --hidden-import dns.rdtypes `

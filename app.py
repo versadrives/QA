@@ -20,7 +20,7 @@ app = Flask(
     static_folder=resource_path("static"),
 )
 
-socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
+socketio = SocketIO(app,cors_allowed_origins="*")
 
 DB_FILE = "scan_log.db"
 

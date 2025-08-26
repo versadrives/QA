@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QA Final Testing Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        .stat-value.passed {
+            color: var(--success, green);
+        }
+
+        .stat-value.failed {
+            color: var(--error, red);
+        }
+
+        .stat-value strong {
+            font-size: 2rem;
+            font-weight: 800;
+        }
+
+        #modelSpecsContainer {
+            margin: 3rem auto;
+            max-width: 800px;
+            padding: 1rem;
+            border-top: 2px solid var(--border-color);
+        }
+
+        #modelSpecsContainer h2 {
+            margin-bottom: 1rem;
+        }
+
+        #modelSpecsContainer table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        #modelSpecsContainer table,
+        #modelSpecsContainer td,
+        #modelSpecsContainer th {
+            border: 1px solid black;
+            padding: 6px;
+        }
+
+        form.inline-form {
+            display: inline-block;
+            margin: 0;
+        }
+
+        #modelSpecsContainer button {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>QA Final Testing Dashboard</h1>
+            <div class="theme-controls">
+                <button class="secondary-btn" id="refreshBtn">⟳</button>
+                <button class="secondary-btn" id="themeBtn">
+                    <span id="themeIcon">🌙</span>
+                </button>
+                <button class="secondary-btn" id="settingsBtn">⚙️</button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-title">Monthly Scans</div>
+                <div class="stat-value" id="monthlyScans">
+                    <strong>{{ monthly_scans }}</strong>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Today's Total</div>
+                <div class="stat-value" id="todayTotal">
+                    <strong>{{ today_total }}</strong>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Today's Passed</div>
+                <div class="stat-value passed" id="todayPassed">
+                    <strong>{{ today_passed }}</strong>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Today's Failed</div>
+                <div class="stat-value failed" id="todayFailed">
+                    <strong>{{ today_failed }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls-container">
+            <div class="scan-form">
+                <div class="search-box">
+                    <input type="text" id="qrInput" placeholder="Scan or enter QR code" autofocus />
+                </div>
+                <button class="primary-btn scan-btn" id="scanBtn">Scan</button>
+            </div>
+
+            <div class="filter-controls">
+                <input type="date" id="dateFilter" value="{{ selected_date }}" />
+                <button class="secondary-btn" id="filterBtn">🔍 Filter</button>
+                <button class="secondary-btn" id="exportBtn">📥 Export</button>
+                <button class="secondary-btn" id="undoBtn">↩️ Undo</button>
+                <button class="secondary-btn" id="voiceBtn">🎤 Voice Recognition</button>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Sl.NO</th>
+                        <th>QR Code</th>
+                        <th>Power</th>
+                        <th>RPM</th>
+                        <th>Power Factor</th>
+                        <th>Failure Code</th>
+                        <th>Status</th>
+                        <th>Timestamp</th>
+                        <th>Result</th>
+                        <th>Voice Recognition</th>
+                    </tr>
+                </thead>
+                <tbody id="scanTableBody">
+                    {% for scan in scans %}
+                    <tr>
+                        <td>{{ scan['daily_number'] }}</td>
+                        <td>{{ scan['qr_code'] }}</td>
+                        <td>{{ scan['power'] }}</td>
+                        <td>{{ scan['rpm'] }}</td>
+                        <td>{{ scan['power_factor'] }}</td>
+                        <td>{{ scan['failure_code'] }}</td>
+                        <td>
+                            <span class="status-badge {{ scan['status'].lower() }}">{{ scan['status'] }}</span>
+                        </td>
+                        <td>{{ scan['timestamp'] }}</td>
+                        <td>{{ scan.result }}</td>
+                        <td>{{ scan.voice_recognition }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="exportModal" class="modal">
+        <div class="modal-content">
+            <h3>Export Scan Data</h3>
+            <form id="exportForm">
+                <div class="form-group">
+                    <label for="startDate">Start Date</label>
+                    <input type="date" id="startDate" required />
+                </div>
+                <div class="form-group">
+                    <label for="endDate">End Date</label>
+                    <input type="date" id="endDate" required />
+                </div>
+                <div class="form-group">
+                    <label for="fileName">File Name</label>
+                    <input type="text" id="fileName" required />
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="secondary-btn" id="cancelExportBtn">Cancel</button>
+                    <button type="submit" class="primary-btn">Export</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="undoModal" class="modal">
+        <div class="modal-content">
+            <h3>Confirm Removal</h3>
+            <p>Are you sure you want to remove the last scan?</p>
+            <div class="modal-actions">
+                <button class="secondary-btn" id="cancelUndoBtn">Cancel</button>
+                <button class="primary-btn danger" id="confirmUndoBtn">Remove</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="failureCodeModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 1rem;">Enter Failure Code and Result</h3>
+            <input type="text" id="failureCodeInput" placeholder="Failure Code" style="width:100%;padding:0.75rem;font-size:1rem;margin-bottom:1rem;border-radius:8px;border:1px solid var(--border-color);" />
+            <input type="text" id="resultInput" placeholder="Result" style="width:100%;padding:0.75rem;font-size:1rem;margin-bottom:1.5rem;border-radius:8px;border:1px solid var(--border-color);" />
+            <div class="modal-actions" style="display:flex;justify-content:flex-end;gap:1rem;">
+                <button class="secondary-btn" id="cancelFailureCodeBtn">Cancel</button>
+                <button class="primary-btn" id="submitFailureCodeBtn">Submit</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="voiceModal" class="modal">
+        <div class="modal-content">
+            <h3>Voice Recognition</h3>
+            <p>Select an option:</p>
+            <div class="modal-actions">
+                <button class="primary-btn" id="voiceOkBtn">OK</button>
+                <button class="primary-btn danger" id="voiceNaBtn">NA</button>
+            </div>
+            <div class="modal-actions" style="margin-top: 1rem;">
+                <button class="secondary-btn" id="cancelVoiceBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+<div id="settingsModal" class="modal">
+    <div class="modal-content" style="max-width:900px;">
+        <h2>Add / Update Model Specifications</h2>
+        <form method="post" action="/models">
+            <input type="hidden" name="action" value="add" />
+
+            <label>
+                Model Prefix
+                <input name="model_prefix" required />
+            </label>
+
+            <label>
+                Power Min
+                <input type="number" name="power_min" step="0.1" required />
+            </label>
+
+            <label>
+                Power Max
+                <input type="number" name="power_max" step="0.1" required />
+            </label>
+
+            <label>
+                PF Min
+                <input type="number" name="pf_min" step="0.01" required />
+            </label>
+
+            <label>
+                RPM Min
+                <input type="number" name="rpm_min" required />
+            </label>
+
+            <label>
+                RPM Max
+                <input type="number" name="rpm_max" required />
+            </label>
+
+            <button type="submit">Add / Replace</button>
+        </form>
+
+<h4 class="mt-4 font-bold">Existing Models</h4>
+<table class="table-auto border-collapse border border-gray-300 w-full text-center">
+  <thead>
+    <tr class="bg-gray-100">
+      <th class="border px-4 py-2">Model</th>
+      <th class="border px-4 py-2">Power Min</th>
+      <th class="border px-4 py-2">Power Max</th>
+      <th class="border px-4 py-2">PF Min</th>
+      <th class="border px-4 py-2">RPM Min</th>
+      <th class="border px-4 py-2">RPM Max</th>
+      <th class="border px-4 py-2">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for model in models %}
+    <tr>
+      <td class="border px-4 py-2">{{ model['model_prefix'] }}</td>
+      <td class="border px-4 py-2">{{ model['power_min'] }}</td>
+      <td class="border px-4 py-2">{{ model['power_max'] }}</td>
+      <td class="border px-4 py-2">{{ model['pf_min'] }}</td>
+      <td class="border px-4 py-2">{{ model['rpm_min'] }}</td>
+      <td class="border px-4 py-2">{{ model['rpm_max'] }}</td>
+      <td class="border px-4 py-2 space-x-2">
+        <!-- Delete Button -->
+<form method="post" action="/models/delete/{{ model.model_prefix }}" 
+      onsubmit="return confirm('Delete model {{ model.model_prefix }}?');" 
+      class="inline-form">
+  <button type="submit" class="danger-btn">
+    Delete
+  </button>
+</form>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+
+        <div style="text-align:right;margin-top:1.5rem;">
+            <button class="secondary-btn" id="closeSettingsBtn">Close</button>
+        </div>
+    </div>
+</div>
+
+    <script>
+        function sendVoiceOption(option) {
+            fetch('/voice_recognition', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'option=' + option
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert('Voice Recognition option: ' + data.selected);
+                document.getElementById('voiceModal').style.display = 'none';
+            });
+        }
+
+        function showFailureCodeModal() {
+            const modal = document.getElementById('failureCodeModal');
+            modal.style.display = 'block';
+            setTimeout(() => {
+                const input = document.getElementById('failureCodeInput');
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }, 50);
+        }
+
+        const failureInput = document.getElementById('failureCodeInput');
+        if (failureInput) {
+            failureInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    document.getElementById('submitFailureCodeBtn').click();
+                }
+            });
+        }
+
+        document.getElementById('refreshBtn').onclick = () => window.location.reload();
+
+        document.getElementById('voiceBtn').onclick = () => {
+            document.getElementById('voiceModal').style.display = 'block';
+        };
+        document.getElementById('cancelVoiceBtn').onclick = () => {
+            document.getElementById('voiceModal').style.display = 'none';
+        };
+        document.getElementById('voiceOkBtn').onclick = () => sendVoiceOption('OK');
+        document.getElementById('voiceNaBtn').onclick = () => sendVoiceOption('NA');
+
+        document.getElementById('settingsBtn').onclick = () => {
+            document.getElementById('settingsModal').classList.add('show');
+        };
+        document.getElementById('closeSettingsBtn').onclick = () => {
+            document.getElementById('settingsModal').classList.remove('show');
+        };
+
+        // Optional: close modal when clicking outside modal-content
+        document.getElementById('settingsModal').addEventListener('click', function(e) {
+            if (e.target === this) this.classList.remove('show');
+        });
+    </script>
+
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>

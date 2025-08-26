@@ -28,6 +28,8 @@ jobs:
       - name: Build with PyInstaller
         run: |
           pyinstaller `
+            --hidden-import dns.asyncresolver `
+            --collect-submodules dns `
             --noconsole `
             --onefile `
             --name QA_Testing_App `

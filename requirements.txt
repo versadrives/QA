@@ -6,3 +6,7 @@ pywebview
 pyinstaller
 pywin32; platform_system == "Windows"
 pyserial
+eventlet
+gevent
+gevent-websocket
+

@@ -4,6 +4,5 @@ python-socketio
 python-engineio
 pywebview
 pyinstaller
-pywin32; platfor_system == "Windows"
+pywin32; platform_system == "Windows"
 pyserial
-

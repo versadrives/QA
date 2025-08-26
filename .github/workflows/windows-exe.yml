@@ -22,28 +22,39 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          # Ensure dnspython is installed for Eventlet greendns
+          pip install dnspython openpyxl
 
       - name: Build with PyInstaller
-        run: >
-          pyinstaller
-          --noconsole
-          --onefile
-          --name QA_Testing_App
-          --add-data "templates;templates"
-          --add-data "static;static"
-          --collect-all webview
-          --hidden-import flask_socketio
-          --hidden-import socketio
-          --hidden-import engineio
-          --hidden-import eventlet
-          --hidden-import eventlet.green.socket
-          --hidden-import eventlet.hubs
-          --hidden-import eventlet.hubs.epolls
-          --hidden-import eventlet.hubs.kqueue
-          --hidden-import eventlet.hubs.selects
-          --hidden-import eventlet.hubs.poll
-          --hidden-import eventlet.support.greenlets
-          run_app.py
+        run: |
+          pyinstaller ^
+            --noconsole ^
+            --onefile ^
+            --name QA_Testing_App ^
+            --add-data "templates;templates" ^
+            --add-data "static;static" ^
+            --collect-all webview ^
+            --hidden-import flask_socketio ^
+            --hidden-import socketio ^
+            --hidden-import engineio ^
+            --hidden-import eventlet ^
+            --hidden-import eventlet.green ^
+            --hidden-import eventlet.green.socket ^
+            --hidden-import eventlet.support ^
+            --hidden-import eventlet.support.greenlets ^
+            --hidden-import eventlet.hubs ^
+            --hidden-import eventlet.hubs.epolls ^
+            --hidden-import eventlet.hubs.kqueue ^
+            --hidden-import eventlet.hubs.selects ^
+            --hidden-import eventlet.hubs.poll ^
+            --hidden-import dns ^
+            --hidden-import dns.rdtypes ^
+            --hidden-import dns.rdatatype ^
+            --hidden-import dns.exception ^
+            --hidden-import dns.name ^
+            --hidden-import dns.message ^
+            --hidden-import dns.query ^
+            run_app.py
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4

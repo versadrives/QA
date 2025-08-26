@@ -35,7 +35,10 @@ jobs:
           --hidden-import flask_socketio
           --hidden-import socketio
           --hidden-import engineio
+          --hidden-import eventlet
+          --hidden-import gevent
           run_app.py
+
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4

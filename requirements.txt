@@ -1,12 +1,11 @@
 flask
-flask-socketio
-python-socketio
-python-engineio
+flask-socketio==5.3.6
+python-socketio==5.11.4
+python-engineio==4.11.2
 pywebview
 pyinstaller
 pywin32; platform_system == "Windows"
 pyserial
-eventlet
-gevent
-gevent-websocket
-
+eventlet==0.36.1
+gevent==24.2.1
+gevent-websocket==0.10.1

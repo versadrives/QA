@@ -1,0 +1,44 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build with PyInstaller
+        run: >
+          pyinstaller
+          --noconsole
+          --onefile
+          --name QA_Testing_App
+          --add-data "templates;templates"
+          --add-data "static;static"
+          --collect-all webview
+          --hidden-import flask_socketio
+          --hidden-import socketio
+          --hidden-import engineio
+          run_app.py
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QA_Testing_App
+          path: dist/QA_Testing_App.exe

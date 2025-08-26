@@ -543,6 +543,6 @@ def update_failure_code_and_result():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-
     init_db()
+    print(">>> Flask-SocketIO async_mode:", socketio.async_mode)  # debug print
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)

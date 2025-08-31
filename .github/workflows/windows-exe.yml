@@ -47,6 +47,7 @@ jobs:
         echo "    'dns.asyncquery'," >> hook-eventlet.py
         echo "    'dns.asyncbackend'," >> hook-eventlet.py
         echo "    'dns.asyncresolver'," >> hook-eventlet.py
+        echo "    'dns.dnssec'," >> hook-eventlet.py
         echo "    'dns.rdtypes.ANY'," >> hook-eventlet.py
         echo "    'dns.rdtypes.CH'," >> hook-eventlet.py
         echo "    'dns.rdtypes.IN'," >> hook-eventlet.py

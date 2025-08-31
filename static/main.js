@@ -16,10 +16,10 @@ const elements = {
     undoModal: document.getElementById('undoModal'),
     exportForm: document.getElementById('exportForm'),
     notification: document.getElementById('notification'),
-    monthlyScans: document.getElementById('monthlyScans'),
-    todayTotal: document.getElementById('todayTotal'),
-    todayPassed: document.getElementById('todayPassed'),
-    todayFailed: document.getElementById('todayFailed'),
+    totalPassed: document.querySelector('.total-passed strong'),
+    firstPassed: document.querySelector('.first-passed strong'),
+    rework: document.querySelector('.rework strong'),
+    secondPassed: document.querySelector('.second-passed strong'),
     failureCodeModal: document.getElementById('failureCodeModal'),
     powerInput: document.getElementById('powerInput'),
     powerFactorInput: document.getElementById('powerFactorInput'),
@@ -31,6 +31,7 @@ const elements = {
 let darkMode = localStorage.getItem('darkMode') === 'true';
 let pendingScanData = null;
 let currentScanId = null;
+
 
 // Initialize dark mode
 if (darkMode) {
@@ -149,23 +150,41 @@ async function submitScan(failureCode = 'NA') {
 
         const data = await response.json();
 
+        // Add the duplicate FP OK check here:
+        if (data.duplicate_fp_ok) {
+            showNotification('⚠️ Duplicate scan not allowed.'); 
+            highlightDuplicateRow(qrCode);  // Optional, highlight existing FP OK row
+            return;  // Stop further processing
+        }
+
+        // The existing error/success handling code follows:
         if (data.error) {
             showNotification(`⚠️ ${data.error}`, 'error');
         } else if (data.success) {
-            elements.qrInput.value = '';
-            elements.qrInput.focus();
+    elements.qrInput.value = '';
+    elements.qrInput.focus();
 
-            if (data.data.status === 'FAIL' && data.data.failure_code === '') {
-                // Show modal for failure code
-                pendingScanData = { qrCode };
-                showModal('failureCodeModal');
-            } else {
-                showNotification(
-                    data.data.status === 'PASS' ? '✅ Scan added - PASS' : '⚠️ Scan added - FAIL',
-                    data.data.status === 'PASS' ? 'success' : 'error'
-                );
-            }
+    if (data.data.status === 'FAIL' && data.data.failure_code === '') {
+        pendingScanData = { qrCode };
+        showModal('failureCodeModal');
+    } else {
+        showNotification(
+            data.data.status === 'PASS' ? '✅ Scan added - PASS' : '⚠️ Scan added - FAIL',
+            data.data.status === 'PASS' ? 'success' : 'error'
+        );
+
+        // ✅ Use backend stats
+
+        if (data.stats) {
+            elements.totalPassed.textContent = data.stats.total_passed;
+            elements.firstPassed.textContent = data.stats.first_passed;
+            elements.rework.textContent = data.stats.rework;
+            elements.secondPassed.textContent = data.stats.second_passed;
         }
+
+    }
+}
+
     } catch (error) {
         console.error('Scan error:', error);
         showNotification('⚠️ Failed to submit scan', 'error');
@@ -198,27 +217,37 @@ function handleNewScan(data) {
         <td>${data.voice_recognition || 'NA'}</td>
     `;
     elements.scanTableBody.insertBefore(row, elements.scanTableBody.firstChild);
-    updateStats(data.status === 'PASS');
+    updateStats();
     showNotification(
         data.status === 'PASS' ? '✅ Scan added - PASS' : '⚠️ Scan added - FAIL',
         data.status === 'PASS' ? 'success' : 'error'
     );
+    highlightAllDuplicateRows();
+
 }
 
 async function handleUndo() {
     hideModal('undoModal');
     
     try {
-        const response = await fetch('/undo', {
-            method: 'POST',
-        });
+        const response = await fetch('/undo', { method: 'POST' });
         const data = await response.json();
 
         if (data.success) {
             if (elements.scanTableBody.firstElementChild) {
                 elements.scanTableBody.firstElementChild.remove();
             }
-            updateStats();
+
+            // ✅ Update stats after undo
+            if (data.stats) {
+                elements.totalPassed.textContent = data.stats.total_passed;
+                elements.firstPassed.textContent = data.stats.first_passed;
+                elements.rework.textContent = data.stats.rework;
+                elements.secondPassed.textContent = data.stats.second_passed;
+            } else {
+                updateStats();
+            }
+
             showNotification('Last scan removed', 'success');
         } else {
             showNotification(data.error || 'Failed to remove scan', 'error');
@@ -228,6 +257,7 @@ async function handleUndo() {
         showNotification('Failed to remove scan', 'error');
     }
 }
+
 
 function handleExport(e) {
     e.preventDefault();
@@ -261,6 +291,41 @@ function updateFailureCodeAndResult(failureCode, result) {
         alert(error.message);
     });
 }
+
+// Highlights all rows with duplicate QR Codes in the table
+function highlightAllDuplicateRows() {
+    const rows = elements.scanTableBody.querySelectorAll('tr');
+    const qrCodeCount = {};
+
+    rows.forEach(row => {
+        const qrCode = row.cells[1]?.textContent.trim();
+        if (qrCode) {
+            qrCodeCount[qrCode] = (qrCodeCount[qrCode] || 0) + 1;
+        }
+    });
+
+    rows.forEach(row => {
+        const qrCode = row.cells[1]?.textContent.trim();
+        if (qrCode && qrCodeCount[qrCode] > 1) {
+            row.classList.add('duplicate-row');
+        } else {
+            row.classList.remove('duplicate-row');
+        }
+    });
+}
+
+// Highlights the row for a specific QR code (useful to highlight newly added duplicates)
+function highlightDuplicateRow(qrCode) {
+    const rows = elements.scanTableBody.querySelectorAll('tr');
+    rows.forEach(row => {
+        const cell = row.cells[1];
+        if (cell && cell.textContent.trim() === qrCode) {
+            row.classList.add('duplicate-row');
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    });
+}
+
 
 
 document.getElementById('submitFailureCodeBtn').onclick = function() {
@@ -400,23 +465,169 @@ function toggleFullscreen() {
     }
 }
 
-function updateStats(isPassing) {
-    // Update monthly scans
-    const monthly = parseInt(elements.monthlyScans.textContent) || 0;
-    elements.monthlyScans.textContent = monthly + 1;
 
-    // Update today's total
-    const total = parseInt(elements.todayTotal.textContent) || 0;
-    elements.todayTotal.textContent = total + 1;
 
-    // Update passed/failed with color classes
-    if (isPassing) {
-        const passed = parseInt(elements.todayPassed.textContent) || 0;
-        elements.todayPassed.textContent = passed + 1;
-        elements.todayPassed.classList.add('passed');
+document.getElementById('editLastScanBtn').onclick = function() {
+  // Show modal
+  document.getElementById('editLastScanModal').style.display = 'block';
+};
+
+document.getElementById('cancelEditBtn').onclick = function() {
+  // Hide modal
+  document.getElementById('editLastScanModal').style.display = 'none';
+};
+
+document.getElementById('saveEditBtn').onclick = async function() {
+  const failureCode = document.getElementById('editFailureCode').value.trim();
+  const result = document.getElementById('editResult').value.trim();
+
+  if (!failureCode || !result) {
+    showNotification('Please enter both failure code and result.', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch('/edit_last_scan', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: `failure_code=${encodeURIComponent(failureCode)}&result=${encodeURIComponent(result)}`
+    });
+    const data = await response.json();
+    if (data.success) {
+      showNotification('✅ Last scan updated successfully', 'success');
+      document.getElementById('editLastScanModal').style.display = 'none';
+      location.reload();  // Refresh to show updated data
     } else {
-        const failed = parseInt(elements.todayFailed.textContent) || 0;
-        elements.todayFailed.textContent = failed + 1;
-        elements.todayFailed.classList.add('failed');
+      showNotification(`Error: ${data.error || 'Failed to update'}`, 'error');
     }
+  } catch (error) {
+    showNotification('Error updating last scan', 'error');
+  }
+};
+
+
+
+document.getElementById('editLastScanBtn').onclick = async function () {
+    // Fetch last scan details
+    try {
+        const res = await fetch('/last_scan');
+        const scan = await res.json();
+        if (scan.error) {
+            alert(scan.error);
+            return;
+        }
+        // Populate display fields
+        document.getElementById('lastScanQr').textContent = scan.qr_code || '';
+        document.getElementById('lastScanPower').textContent = scan.power || '';
+        document.getElementById('lastScanRpm').textContent = scan.rpm || '';
+        document.getElementById('lastScanPf').textContent = scan.power_factor || '';
+
+        // Prefill inputs with current values
+        document.getElementById('editFailureCode').value = scan.failure_code || '';
+        document.getElementById('editResult').value = scan.result || '';
+
+        // Show modal
+        document.getElementById('editLastScanModal').style.display = 'grid';
+
+        // Focus the failure code input
+        document.getElementById('editFailureCode').focus();
+
+    } catch (e) {
+        alert('Failed to load last scan details.');
+    }
+};
+ 
+const voiceToggleBtn = document.getElementById('voiceToggleBtn');
+let currentVoiceState = 'NA';
+
+async function fetchVoiceState() {
+  try {
+    const res = await fetch('/defaults');
+    const data = await res.json();
+    currentVoiceState = data.default_voice_recognition || 'NA';
+  } catch {
+    currentVoiceState = 'NA';
+  }
+  updateVoiceToggleUI();
 }
+
+function updateVoiceToggleUI() {
+  voiceToggleBtn.textContent = `Voice: ${currentVoiceState}`;
+  if (currentVoiceState === 'OK') {
+    voiceToggleBtn.classList.add('active');
+  } else {
+    voiceToggleBtn.classList.remove('active');
+  }
+}
+
+voiceToggleBtn.addEventListener('click', async () => {
+  currentVoiceState = currentVoiceState === 'NA' ? 'OK' : 'NA';
+  updateVoiceToggleUI();
+
+  try {
+    const response = await fetch('/voice_recognition', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `option=${encodeURIComponent(currentVoiceState)}`
+    });
+    const resData = await response.json();
+    if (!resData.success) {
+      alert('Failed to update voice recognition');
+    }
+  } catch {
+    alert('Error updating voice recognition');
+  }
+});
+
+document.getElementById("formatScansBtn").addEventListener("click", function() {
+    const userInput = prompt("⚠️ This will permanently delete all scan logs.\n\nTo confirm, type DELETE in all caps:");
+
+    if (userInput === "DELETE") {
+        fetch("/clear_scans", { method: "POST" })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload(); // refresh to show empty scans
+                } else {
+                    alert("Error: " + (data.error || "Could not clear scans."));
+                }
+            })
+            .catch(err => {
+                console.error("Error clearing scans:", err);
+                alert("Something went wrong!");
+            });
+    } else if (userInput !== null) {
+        alert("❌ Confirmation failed. Type DELETE in uppercase to proceed.");
+    }
+});
+
+// Recalculate stats based on current table rows
+function updateStats() {
+    let totalPassed = 0;
+    let firstPassed = 0;
+    let rework = 0;
+    let secondPassed = 0;
+
+    const rows = elements.scanTableBody.querySelectorAll('tr');
+    rows.forEach(row => {
+        const status = row.cells[6]?.textContent.trim(); // status column
+        const result = row.cells[8]?.textContent.trim(); // FP OK / result column
+
+        if (status === 'PASS') totalPassed++;
+        if (result === 'FP OK') firstPassed++;
+        if (status === 'FAIL' && result === 'REWORK') rework++;
+        if (status === 'PASS' && result === 'SECOND PASS') secondPassed++;
+    });
+
+    elements.totalPassed.textContent = totalPassed;
+    elements.firstPassed.textContent = firstPassed;
+    elements.rework.textContent = rework;
+    elements.secondPassed.textContent = secondPassed;
+}
+
+
+fetchVoiceState();
+// Run once on page load to highlight existing duplicates
+highlightAllDuplicateRows();
+

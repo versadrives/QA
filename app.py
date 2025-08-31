@@ -1,5 +1,10 @@
 import eventlet
+import eventlet.hubs.epolls
+import eventlet.hubs.kqueue
+import eventlet.hubs.poll
+import eventlet.hubs.selects
 eventlet.monkey_patch()
+
 from flask import Flask, render_template, request, redirect, send_file, jsonify
 from flask_socketio import SocketIO
 import sqlite3

@@ -4,9 +4,8 @@ on:
   push:
     branches: [main, master]
   workflow_dispatch:
-  # Trigger release job on tags
   release:
-    types: [created]
+    types: [created]  # Trigger release job on tag creation
 
 jobs:
   build:
@@ -27,6 +26,9 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller pytest
 
+    - name: Set PYTHONPATH
+      run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
+
     - name: Run tests
       run: pytest tests/
 
@@ -39,7 +41,7 @@ jobs:
           --add-data "scan_log.db;." \
           --add-data "templates;templates" \
           --add-data "static;static" \
-          run_app.py
+          app.py
 
     - name: Smoke test exe
       run: .\dist\QA_Testing_App.exe --help
@@ -50,11 +52,12 @@ jobs:
         name: QA_Testing_App
         path: dist/QA_Testing_App.exe
 
+
   release:
     runs-on: windows-latest
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
-    
+
     steps:
     - name: Download EXE artifact
       uses: actions/download-artifact@v3

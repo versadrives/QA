@@ -40,7 +40,7 @@ body {
     color: var(--text-primary);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
-    transition: background-color 0.3s, color 0.3s;
+    transition: background-color 0.3s, color 1s;
 }
 
 /* Dashboard layout */
@@ -85,12 +85,10 @@ body {
     width: 100%;
 }
 
-.search-box {
-    flex: 1;
-}
+
 
 .search-box input[type="text"] {
-    width: 100%;
+    width: 400px;
     height: 56px;
     padding: 0 1.5rem;
     font-size: 1.1rem;
@@ -301,7 +299,7 @@ td {
     box-shadow: var(--shadow-md);
     transform: translateY(100px);
     opacity: 0;
-    transition: all 0.3s ease;
+    transition: all 0.5s ease;
     z-index: 1000;
 }
 
@@ -564,4 +562,167 @@ body:hover::-webkit-scrollbar-thumb {
 
 .inline-form .danger-btn:hover {
     background-color: #b91c1c !important; /* Tailwind red-700 */
+}
+
+
+#editLastScanModal div > p {
+  margin: 0.3rem 0;
+  font-size: 1rem;
+  color: var(--text-secondary);
+}
+
+/* Total Passed (black) */
+.stat-value.total-passed {
+  color: rgb(0, 0, 0);
+}
+
+/* First Passed FP OK (green) */
+.stat-value.first-passed {
+  color: var(--success);  /* green */
+}
+
+.stat-title {
+    font-size: 1.25rem;  /* Increase base size for all titles */
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+}
+
+/* Specific titles */
+.stat-title.total-passed {
+    font-size: 1.5rem;  /* Larger size for 'Total Passed' */
+}
+
+.stat-title.first-passed {
+    font-size: 1.5rem;  /* Larger size for 'First Passed' */
+}
+
+.stat-title.rework {
+    font-size: 1.5rem;  /* Larger size for 'Rework' */
+}
+
+.stat-title.second-passed {
+    font-size: 1.5rem;  /* Larger size for 'Second Passed' */
+}
+
+
+/* Rework RW (red) */
+.stat-value.rework {
+  color: var(--error);    /* red */
+}
+
+/* Second Passed SP OK (yellow) */
+.stat-value.second-passed {
+  color: #f7b018;         /* Tailwind yellow-600 */
+}
+
+/* Voice toggle button active state - persistent blue background */
+#voiceToggleBtn.active {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+/* Optional: slightly darker on hover when active */
+#voiceToggleBtn.active:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+
+.duplicate-row {
+    background-color: #dbd7d5 !important;
+    color: white;
+    font-weight: bold;
+}
+
+.testing-title {
+    text-align: center;
+    margin-top: 1.3rem;
+    margin-bottom: 1.3rem;
+    font-size: 1.7rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #2c4d95
+}
+
+.brand-title {
+    display: flex;
+    align-items: center;
+    margin-right: auto;
+    font-size: 1.9rem;
+    color: #2c4d95
+}
+
+.theme-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-left: auto;   /* <---- This pushes theme controls to the far right */
+}
+
+
+.corner-logo {
+    position: absolute;
+    margin-top: 0.7rem;
+    top: 15px;
+    right: 85px;
+    width: 230px;   /* adjust size */
+    height: auto;
+    opacity: 0.9;   /* slightly transparent if you like */
+    z-index: 1000; 
+     /* keeps it above everything */
+}
+
+/* Make input wrapper relative */
+.input-wrapper {
+    position: relative;
+    width: 100%; /* or set a fixed width if needed */
+}
+
+/* Suggestions now drop below input */
+#suggestions {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    max-height: 180px;
+    overflow-y: auto;
+    background: var(--bg-primary);
+    box-shadow: var(--shadow-sm);
+    display: none;
+    position: absolute;
+    top: 100%;       /* place it just under input */
+    left: 0;
+    width: 100%;     /* match input width */
+    z-index: 1000;
+}
+
+
+/* Each suggestion item */
+#suggestions li {
+    padding: 0.65rem 1rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+/* Hover effect */
+#suggestions li:hover {
+    background: var(--bg-tertiary);
+    color: var(--accent-primary);
+}
+
+/* Danger button (FORMAT / Delete actions) */
+/* Format button (inherits all secondary-btn styles but text is red) */
+.format-btn {
+    color: red !important;    /* force text red */
+    font-weight: bold;        /* optional: make it stand out */
+}
+.format-btn:hover {
+    background-color: #ffe5e5 !important; /* light red bg on hover */
+    color: red !important;                 /* keep text red */
 }

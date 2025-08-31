@@ -5,6 +5,7 @@ hiddenimports = [
     'eventlet.hubs.selects',
     'dns.asyncquery',
     'dns.asyncbackend',
+    'dns.asyncresolver',
     'dns.rdtypes.ANY',
     'dns.rdtypes.CH',
     'dns.rdtypes.IN',

@@ -49,7 +49,8 @@ jobs:
         echo "    'dns.rdtypes.IN'," >> hook-eventlet.py
         echo "    'dns.rdtypes.MAIL'," >> hook-eventlet.py
         echo "    'dns.rdtypes.RP'," >> hook-eventlet.py
-        echo "    'dns.rdtypes.OTHER'" >> hook-eventlet.py
+        echo "    'dns.rdtypes.OTHER'," >> hook-eventlet.py
+        echo "    'dns.rdtypes.dnskeybase'" >> hook-eventlet.py
         echo "]" >> hook-eventlet.py
 
     - name: Build executable with PyInstaller

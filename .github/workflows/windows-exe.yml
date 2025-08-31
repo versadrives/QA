@@ -67,6 +67,7 @@ jobs:
         echo "    'dns.rcode'," >> hook-eventlet.py
         echo "    'dns.rrset'," >> hook-eventlet.py
         echo "    'dns.resolver'" >> hook-eventlet.py
+        echo "    'dns.namedict'" >> hook-eventlet.py
         echo "]" >> hook-eventlet.py
 
     - name: Build executable with PyInstaller

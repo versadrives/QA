@@ -1,65 +1,70 @@
-name: Build Windows EXE
+name: Build, Test, and Release Windows EXE
 
 on:
-  workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
+  workflow_dispatch:
+  # Trigger release job on tags
+  release:
+    types: [created]
 
 jobs:
-  build-windows:
+  build:
     runs-on: windows-latest
+
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+    - name: Checkout repo
+      uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install "dnspython>=2.3.0" openpyxl
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller pytest
 
-      - name: Build with PyInstaller
-        run: |
-          pyinstaller `
-            --hidden-import dns.asyncresolver `
-            --collect-submodules dns `
-            --noconsole `
-            --onefile `
-            --name QA_Testing_App `
-            --add-data "templates;templates" `
-            --add-data "static;static" `
-            --collect-all webview `
-            --hidden-import flask_socketio `
-            --hidden-import socketio `
-            --hidden-import engineio `
-            --hidden-import eventlet `
-            --hidden-import eventlet.green `
-            --hidden-import eventlet.green.socket `
-            --hidden-import eventlet.support `
-            --hidden-import eventlet.support.greenlets `
-            --hidden-import eventlet.hubs `
-            --hidden-import eventlet.hubs.epolls `
-            --hidden-import eventlet.hubs.kqueue `
-            --hidden-import eventlet.hubs.selects `
-            --hidden-import eventlet.hubs.poll `
-            --hidden-import engineio.async_drivers.eventlet `
-            --hidden-import dns `
-            --hidden-import dns.asyncquery `
-            --hidden-import dns.rdtypes `
-            --hidden-import dns.rdatatype `
-            --hidden-import dns.exception `
-            --hidden-import dns.name `
-            --hidden-import dns.message `
-            --hidden-import dns.query `
-            run_app.py
+    - name: Run tests
+      run: pytest tests/
 
-      - name: Upload EXE artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: QA_Testing_App
-          path: dist/QA_Testing_App.exe
+    - name: Build exe with PyInstaller
+      run: |
+        pyinstaller \
+          --name QA_Testing_App \
+          --onefile \
+          --noconsole \
+          --add-data "scan_log.db;." \
+          --add-data "templates;templates" \
+          --add-data "static;static" \
+          run_app.py
+
+    - name: Smoke test exe
+      run: .\dist\QA_Testing_App.exe --help
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: QA_Testing_App
+        path: dist/QA_Testing_App.exe
+
+  release:
+    runs-on: windows-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Download EXE artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: QA_Testing_App
+        path: ./artifact
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ./artifact/QA_Testing_App.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

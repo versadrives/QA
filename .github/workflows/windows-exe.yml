@@ -5,11 +5,12 @@ on:
     branches: [main, master]
   workflow_dispatch:
   release:
-    types: [created]  # Trigger release on tag creation
+    types: [created]  # Trigger the release job when a tag is created
 
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
     - name: Checkout repo
       uses: actions/checkout@v4
@@ -35,15 +36,15 @@ jobs:
       run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
 
     - name: Run tests
-      run: pytest tests/ -o pythonpath=$(pwd)
+      run: pytest tests/
 
-    - name: Build exe with PyInstaller
+    - name: Build executable with PyInstaller
       run: pyinstaller --name QA_Testing_App --onefile --noconsole --add-data "scan_log.db;." --add-data "templates;templates" --add-data "static;static" app.py
 
-    - name: Smoke test exe
+    - name: Smoke test executable
       run: .\dist\QA_Testing_App.exe --help
 
-    - name: Upload artifact
+    - name: Upload EXE artifact
       uses: actions/upload-artifact@v4
       with:
         name: QA_Testing_App
@@ -53,6 +54,7 @@ jobs:
     runs-on: windows-latest
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
+
     steps:
     - name: Download EXE artifact
       uses: actions/download-artifact@v3

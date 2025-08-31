@@ -6,6 +6,7 @@
     <title>QA Final Testing Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    
     <style>
         .stat-value.passed {
             color: var(--success, green);
@@ -57,43 +58,43 @@
     <div class="dashboard-container">
         <!-- Header -->
         <div class="header">
-            <h1>QA Final Testing Dashboard</h1>
-            <div class="theme-controls">
-                <button class="secondary-btn" id="refreshBtn">⟳</button>
-                <button class="secondary-btn" id="themeBtn">
-                    <span id="themeIcon">🌙</span>
-                </button>
-                <button class="secondary-btn" id="settingsBtn">⚙️</button>
-            </div>
+            <div class="header-center">
+                <h2 class="testing-title">CF NO-LOAD TESTING</h2> 
+    </div>
         </div>
+        <img src="{{ url_for('static', filename='Logo__1_-removebg-preview.png') }}" 
+     alt="Logo" class="corner-logo">
+
 
         <!-- Stats -->
         <div class="stats-container">
-            <div class="stat-card">
-                <div class="stat-title">Monthly Scans</div>
-                <div class="stat-value" id="monthlyScans">
-                    <strong>{{ monthly_scans }}</strong>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">Today's Total</div>
-                <div class="stat-value" id="todayTotal">
-                    <strong>{{ today_total }}</strong>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">Today's Passed</div>
-                <div class="stat-value passed" id="todayPassed">
-                    <strong>{{ today_passed }}</strong>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-title">Today's Failed</div>
-                <div class="stat-value failed" id="todayFailed">
-                    <strong>{{ today_failed }}</strong>
-                </div>
+        <div class="stat-card">
+            <H4 class="stat-title">Total Passed </H4>
+            <div class="stat-value total-passed">
+            <strong>{{ total_passed }}</strong>
             </div>
         </div>
+        <div class="stat-card">
+            <h4 class="stat-title">First Passed</h4>
+            <div class="stat-value first-passed">
+            <strong>{{ first_passed }}</strong>
+            </div>
+        </div>
+        <div class="stat-card">
+            <h4 class="stat-title">Rework</h4>
+            <div class="stat-value rework">
+            <strong>{{ rework }}</strong>
+            </div>
+        </div>
+        <div class="stat-card">
+            <h4 class="stat-title">Second Passed</h4>
+            <div class="stat-value second-passed">
+            <strong>{{ second_passed }}</strong>
+            </div>
+        </div>
+        </div>
+
+
 
         <!-- Controls -->
         <div class="controls-container">
@@ -101,15 +102,65 @@
                 <div class="search-box">
                     <input type="text" id="qrInput" placeholder="Scan or enter QR code" autofocus />
                 </div>
-                <button class="primary-btn scan-btn" id="scanBtn">Scan</button>
+                <button class="primary-btn scan-btn" id="scanBtn">Enter</button>
+                 <div class="theme-controls">
+                <button class="secondary-btn" id="refreshBtn">⟳</button>
+                <button class="secondary-btn" id="themeBtn">
+                    <span id="themeIcon">🌙</span>
+                </button>
+                <button class="secondary-btn" id="settingsBtn">⚙️</button>
+            </div>
             </div>
 
             <div class="filter-controls">
                 <input type="date" id="dateFilter" value="{{ selected_date }}" />
-                <button class="secondary-btn" id="filterBtn">🔍 Filter</button>
-                <button class="secondary-btn" id="exportBtn">📥 Export</button>
-                <button class="secondary-btn" id="undoBtn">↩️ Undo</button>
-                <button class="secondary-btn" id="voiceBtn">🎤 Voice Recognition</button>
+                <button class="secondary-btn" id="filterBtn">Filter</button>
+                <button class="secondary-btn" id="exportBtn">Export</button>
+                <button class="secondary-btn" id="editLastScanBtn">Edit Last Scan</button>
+                <button class="secondary-btn" id="undoBtn">↩ Undo Last Scan</button>
+                <button class="secondary-btn" id="voiceToggleBtn">Voice: NA</button>
+                <button id="formatScansBtn" class="secondary-btn format-btn">Erase Data</button>
+
+
+
+
+            <div id="editLastScanModal" class="modal">
+            <div class="modal-content">
+                <h3>Edit Last Scan</h3>
+                <div>
+                    <strong>Current Scan Details:</strong>
+                    <h2>QR Code: <span id="lastScanQr"></span></h2>
+                    <p>Power: <span id="lastScanPower"></span></p>
+                    <p>RPM: <span id="lastScanRpm"></span></p>
+                    <p>Power Factor: <span id="lastScanPf"></span></p>
+                </div>
+                <div style="position: relative; width: 100%; margin-bottom: 1rem;">
+                    <input 
+                        type="text" 
+                        id="editFailureCode" 
+                        placeholder="New Failure Code"
+                        autocomplete="off"
+                        style="width:100%;padding:0.75rem;font-size:1rem;
+                            border-radius:8px;border:1px solid var(--border-color);" 
+                    />
+                    <ul id="editSuggestions" 
+                        style="list-style:none; margin:0; padding:0; border:1px solid #ccc;
+                                border-radius:8px; max-height:150px; overflow-y:auto; 
+                                display:none; position:absolute; top:100%; left:0; 
+                                background:white; width:100%; z-index:1000;">
+                    </ul>
+                    </div>
+
+                    <input type="text" id="editResult" placeholder="New Result" />
+
+                    <div class="modal-actions">
+                    <button class="secondary-btn" id="cancelEditBtn">Cancel</button>
+                    <button class="primary-btn" id="saveEditBtn">Save</button>
+                    </div>
+                </div>
+                </div>
+
+    
             </div>
         </div>
 
@@ -191,7 +242,150 @@
     <div id="failureCodeModal" class="modal">
         <div class="modal-content">
             <h3 style="margin-bottom: 1rem;">Enter Failure Code and Result</h3>
-            <input type="text" id="failureCodeInput" placeholder="Failure Code" style="width:100%;padding:0.75rem;font-size:1rem;margin-bottom:1rem;border-radius:8px;border:1px solid var(--border-color);" />
+            <!-- Wrapper -->
+<div style="position: relative; width: 100%; margin-bottom: 1rem;">
+    
+    <!-- Failure Code Input -->
+    <input 
+        type="text" 
+        id="failureCodeInput" 
+        placeholder="Failure Code"
+        autocomplete="off"
+        style="width:100%;padding:0.75rem;font-size:1rem;
+               border-radius:8px;border:1px solid var(--border-color);" 
+    />
+
+    <!-- Suggestion box -->
+    <ul id="suggestions" 
+        style="list-style:none; margin:0; padding:0; border:1px solid #ccc;
+               border-radius:8px; max-height:150px; overflow-y:auto; 
+               display:none; position:absolute; top:100%; left:0; 
+               background:white; width:100%; z-index:1000;">
+    </ul>
+</div>
+
+<script>
+const failureCodes = [
+    "Correct watts/High RPM - FT1",
+    "Correct watts/Low RPM - FT2",
+    "High watts/ Correct RPM - FT3",
+    "High watts/Low RPM - FT4",
+    "Low watts/Low RPM - FT5",
+    "High watts/High RPM - FT6",
+    "Low watts/Correct RPM - FT7",
+    "Remote operation failed - FT8",
+    "LED did not ON - FT9",
+    "LED Continuously ON - FT10",
+    "Motor did not ON - FT11",
+    "Motor did not run - FT12",
+    "Noise - FT13",
+    "LOW PF - FT14",
+    "Regulator operation failed - FT15",
+    "Motor jerk - FT16",
+    "Motor trip - FT17",
+    "Motor restart - FT18",
+    "Motor runs@ reverse - FT19",
+    "Motor runs@ F/W & R/W direction - FT20",
+    "Motor automatically ON/OFF - FT21",
+    "The firmware was not properly loaded in the motor - FT22",
+    "Scratches due to Handling - Need todo paint touch-up - FT23",
+    "Motor not cleaned properly - FT24",
+    "Screws not tightened properly - FT25",
+    "No gap between dome and top cover - FT26",
+    "Motor wobbling - FT27"
+];
+
+// -------------------- MAIN INPUT --------------------
+const input = document.getElementById("failureCodeInput");
+const suggestions = document.getElementById("suggestions");
+
+if (input && suggestions) {
+  input.addEventListener("input", function() {
+    const query = this.value.toLowerCase();
+    suggestions.innerHTML = "";
+    if (!query) {
+        suggestions.style.display = "none";
+        return;
+    }
+
+    const filtered = failureCodes.filter(code => code.toLowerCase().includes(query));
+
+    if (filtered.length > 0) {
+        filtered.forEach(code => {
+            const li = document.createElement("li");
+            li.textContent = code;
+            li.style.padding = "0.5rem";
+            li.style.cursor = "pointer";
+
+            li.addEventListener("click", () => {
+                const match = code.match(/FT\d+/i);
+                input.value = match ? match[0] : code;
+                suggestions.style.display = "none";
+            });
+
+            li.addEventListener("mouseover", () => li.style.background = "#f0f0f0");
+            li.addEventListener("mouseout", () => li.style.background = "white");
+            suggestions.appendChild(li);
+        });
+        suggestions.style.display = "block";
+    } else {
+        suggestions.style.display = "none";
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+      if (e.target !== input) {
+          suggestions.style.display = "none";
+      }
+  });
+}
+
+// -------------------- EDIT MODAL INPUT --------------------
+const editInput = document.getElementById("editFailureCode");
+const editSuggestions = document.getElementById("editSuggestions");
+
+if (editInput && editSuggestions) {
+  editInput.addEventListener("input", function() {
+    const query = this.value.toLowerCase();
+    editSuggestions.innerHTML = "";
+    if (!query) {
+        editSuggestions.style.display = "none";
+        return;
+    }
+
+    const filtered = failureCodes.filter(code => code.toLowerCase().includes(query));
+
+    if (filtered.length > 0) {
+        filtered.forEach(code => {
+            const li = document.createElement("li");
+            li.textContent = code;
+            li.style.padding = "0.5rem";
+            li.style.cursor = "pointer";
+
+            li.addEventListener("click", () => {
+                const match = code.match(/FT\d+/i);
+                editInput.value = match ? match[0] : code;
+                editSuggestions.style.display = "none";
+            });
+
+            li.addEventListener("mouseover", () => li.style.background = "#f0f0f0");
+            li.addEventListener("mouseout", () => li.style.background = "white");
+            editSuggestions.appendChild(li);
+        });
+        editSuggestions.style.display = "block";
+    } else {
+        editSuggestions.style.display = "none";
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+      if (e.target !== editInput) {
+          editSuggestions.style.display = "none";
+      }
+  });
+}
+</script>
+
             <input type="text" id="resultInput" placeholder="Result" style="width:100%;padding:0.75rem;font-size:1rem;margin-bottom:1.5rem;border-radius:8px;border:1px solid var(--border-color);" />
             <div class="modal-actions" style="display:flex;justify-content:flex-end;gap:1rem;">
                 <button class="secondary-btn" id="cancelFailureCodeBtn">Cancel</button>
@@ -279,13 +473,12 @@
       <td class="border px-4 py-2">{{ model['rpm_max'] }}</td>
       <td class="border px-4 py-2 space-x-2">
         <!-- Delete Button -->
-<form method="post" action="/models/delete/{{ model.model_prefix }}" 
-      onsubmit="return confirm('Delete model {{ model.model_prefix }}?');" 
-      class="inline-form">
-  <button type="submit" class="danger-btn">
-    Delete
-  </button>
+<form method="post" action="/models" class="inline-form" onsubmit="return confirm('Delete model {{ model.model_prefix }}?');">
+    <input type="hidden" name="action" value="delete" />
+    <input type="hidden" name="model_prefix" value="{{ model.model_prefix }}" />
+    <button type="submit" class="danger-btn">Delete</button>
 </form>
+
         </form>
       </td>
     </tr>
@@ -337,9 +530,13 @@
 
         document.getElementById('refreshBtn').onclick = () => window.location.reload();
 
-        document.getElementById('voiceBtn').onclick = () => {
-            document.getElementById('voiceModal').style.display = 'block';
-        };
+        const voiceBtn = document.getElementById('voiceBtn');
+        if (voiceBtn) {
+            voiceBtn.onclick = () => {
+                const voiceModal = document.getElementById('voiceModal');
+                if (voiceModal) voiceModal.style.display = 'block';
+            };
+        }
         document.getElementById('cancelVoiceBtn').onclick = () => {
             document.getElementById('voiceModal').style.display = 'none';
         };

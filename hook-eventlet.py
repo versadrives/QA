@@ -26,3 +26,4 @@ hiddenimports = [
     'dns.rrset',
     'dns.resolver'
 ]
+

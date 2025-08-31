@@ -31,7 +31,8 @@ app = Flask(
     static_folder=resource_path("static"),
 )
 
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+
 
 DB_FILE = resource_path("scan_log.db")
 

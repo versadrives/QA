@@ -25,5 +25,6 @@ hiddenimports = [
     'dns.rcode',
     'dns.rrset',
     'dns.resolver'
+    'dns.namedict'
 ]
 

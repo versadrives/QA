@@ -50,8 +50,10 @@ jobs:
         echo "    'dns.rdtypes.MAIL'," >> hook-eventlet.py
         echo "    'dns.rdtypes.RP'," >> hook-eventlet.py
         echo "    'dns.rdtypes.OTHER'," >> hook-eventlet.py
-        echo "    'dns.rdtypes.dnskeybase'" >> hook-eventlet.py
+        echo "    'dns.rdtypes.dnskeybase'," >> hook-eventlet.py
+        echo "    'dns.asyncbackend'" >> hook-eventlet.py
         echo "]" >> hook-eventlet.py
+
 
     - name: Build executable with PyInstaller
       run: pyinstaller --additional-hooks-dir=. --name QA_Testing_App --onefile --noconsole --add-data "scan_log.db;." --add-data "templates;templates" --add-data "static;static" app.py

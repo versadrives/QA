@@ -7,5 +7,6 @@ hiddenimports = [
     'dns.rdtypes.IN',
     'dns.rdtypes.MAIL',
     'dns.rdtypes.RP',
-    'dns.rdtypes.OTHER'
+    'dns.rdtypes.OTHER',
+    'dns.rdtypes.CH'  # Add this line
 ]

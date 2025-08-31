@@ -10,7 +10,6 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
     - name: Checkout repo
       uses: actions/checkout@v4
@@ -39,15 +38,7 @@ jobs:
       run: pytest tests/ -o pythonpath=$(pwd)
 
     - name: Build exe with PyInstaller
-      run: |
-        pyinstaller \
-          --name QA_Testing_App \
-          --onefile \
-          --noconsole \
-          --add-data "scan_log.db;." \
-          --add-data "templates;templates" \
-          --add-data "static;static" \
-          app.py
+      run: pyinstaller --name QA_Testing_App --onefile --noconsole --add-data "scan_log.db;." --add-data "templates;templates" --add-data "static;static" app.py
 
     - name: Smoke test exe
       run: .\dist\QA_Testing_App.exe --help
@@ -62,7 +53,6 @@ jobs:
     runs-on: windows-latest
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
-
     steps:
     - name: Download EXE artifact
       uses: actions/download-artifact@v3

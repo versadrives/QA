@@ -44,6 +44,8 @@ jobs:
         echo "    'eventlet.hubs.kqueue'," >> hook-eventlet.py
         echo "    'eventlet.hubs.poll'," >> hook-eventlet.py
         echo "    'eventlet.hubs.selects'," >> hook-eventlet.py
+        echo "    'dns.asyncquery'," >> hook-eventlet.py
+        echo "    'dns.asyncbackend'," >> hook-eventlet.py
         echo "    'dns.rdtypes.ANY'," >> hook-eventlet.py
         echo "    'dns.rdtypes.CH'," >> hook-eventlet.py
         echo "    'dns.rdtypes.IN'," >> hook-eventlet.py
@@ -51,8 +53,18 @@ jobs:
         echo "    'dns.rdtypes.RP'," >> hook-eventlet.py
         echo "    'dns.rdtypes.OTHER'," >> hook-eventlet.py
         echo "    'dns.rdtypes.dnskeybase'," >> hook-eventlet.py
-        echo "    'dns.asyncbackend'" >> hook-eventlet.py
+        echo "    'dns.message'," >> hook-eventlet.py
+        echo "    'dns.name'," >> hook-eventlet.py
+        echo "    'dns.rdatatype'," >> hook-eventlet.py
+        echo "    'dns.rdataclass'," >> hook-eventlet.py
+        echo "    'dns.exception'," >> hook-eventlet.py
+        echo "    'dns.flags'," >> hook-eventlet.py
+        echo "    'dns.opcode'," >> hook-eventlet.py
+        echo "    'dns.rcode'," >> hook-eventlet.py
+        echo "    'dns.rrset'," >> hook-eventlet.py
+        echo "    'dns.resolver'" >> hook-eventlet.py
         echo "]" >> hook-eventlet.py
+
 
 
     - name: Build executable with PyInstaller

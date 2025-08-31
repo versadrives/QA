@@ -5,7 +5,7 @@ on:
     branches: [main, master]
   workflow_dispatch:
   release:
-    types: [created]  # Trigger release job on tag creation
+    types: [created]  # Trigger release on tag creation
 
 jobs:
   build:
@@ -26,11 +26,17 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller pytest
 
+    - name: Debug directory structure
+      run: |
+        echo "Current directory: $(pwd)"
+        dir
+        dir tests
+
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
 
     - name: Run tests
-      run: pytest tests/
+      run: pytest tests/ -o pythonpath=$(pwd)
 
     - name: Build exe with PyInstaller
       run: |
@@ -51,7 +57,6 @@ jobs:
       with:
         name: QA_Testing_App
         path: dist/QA_Testing_App.exe
-
 
   release:
     runs-on: windows-latest

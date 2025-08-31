@@ -46,6 +46,7 @@ jobs:
         echo "    'eventlet.hubs.selects'," >> hook-eventlet.py
         echo "    'dns.asyncquery'," >> hook-eventlet.py
         echo "    'dns.asyncbackend'," >> hook-eventlet.py
+        echo "    'dns.asyncresolver'," >> hook-eventlet.py
         echo "    'dns.rdtypes.ANY'," >> hook-eventlet.py
         echo "    'dns.rdtypes.CH'," >> hook-eventlet.py
         echo "    'dns.rdtypes.IN'," >> hook-eventlet.py
@@ -64,6 +65,7 @@ jobs:
         echo "    'dns.rrset'," >> hook-eventlet.py
         echo "    'dns.resolver'" >> hook-eventlet.py
         echo "]" >> hook-eventlet.py
+
 
 
 

@@ -7,6 +7,7 @@ hiddenimports = [
     'dns.asyncbackend',
     'dns.asyncresolver',
     'dns.dnssec',
+    'dns.e164',
     'dns.rdtypes.ANY',
     'dns.rdtypes.CH',
     'dns.rdtypes.IN',

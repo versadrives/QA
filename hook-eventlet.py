@@ -6,6 +6,7 @@ hiddenimports = [
     'dns.asyncquery',
     'dns.asyncbackend',
     'dns.asyncresolver',
+    'dns.dnssec',
     'dns.rdtypes.ANY',
     'dns.rdtypes.CH',
     'dns.rdtypes.IN',

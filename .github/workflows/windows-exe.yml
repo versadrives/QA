@@ -47,13 +47,18 @@ jobs:
           echo "No tests directory found, skipping tests"
         }
         
-    - name: Create comprehensive PyInstaller hook
+    - name: Create comprehensive PyInstaller hooks
       run: |
+        # Create hook for eventlet
         @"
         from PyInstaller.utils.hooks import collect_submodules, collect_data_files
         
-        # Collect all eventlet submodules
-        hiddenimports = [
+        # Collect all eventlet and dns submodules
+        hiddenimports = collect_submodules('eventlet')
+        hiddenimports += collect_submodules('dns')
+        
+        # Add specific modules that are commonly missed
+        hiddenimports += [
             'eventlet.hubs.epolls',
             'eventlet.hubs.kqueue', 
             'eventlet.hubs.poll',
@@ -67,49 +72,21 @@ jobs:
             'eventlet.green.subprocess',
             'eventlet.green.ssl',
             'eventlet.green.httplib',
-            'dns.asyncquery',
-            'dns.asyncbackend',
-            'dns.asyncresolver',
-            'dns.dnssec',
-            'dns.e164',
-            'dns.namedict',
-            'dns.tsigkeyring',
-            'dns.rdtypes.ANY',
-            'dns.rdtypes.CH',
-            'dns.rdtypes.IN',
-            'dns.rdtypes.MAIL',
-            'dns.rdtypes.RP',
-            'dns.rdtypes.OTHER',
-            'dns.rdtypes.dnskeybase',
-            'dns.message',
-            'dns.name',
-            'dns.rdatatype',
-            'dns.rdataclass',
-            'dns.exception',
-            'dns.flags',
-            'dns.opcode',
-            'dns.rcode',
-            'dns.rrset',
-            'dns.resolver',
-            'dns.zone',
-            'dns.query',
-            'dns.reversename',
-            'dns.version',
-            'dns.xfr',
-            'dns.update',
-            'dns.tsig',
-            'dns.ttl',
-            'dns.wire',
-            'dns.grange',
-            'dns.node',
+            'eventlet.support.greendns',
             'sqlite3',
             'openpyxl',
-            'openpyxl.styles'
+            'openpyxl.styles',
+            'openpyxl.styles.alignment',
+            'openpyxl.styles.fonts'
         ]
-        
-        # Add additional eventlet modules
-        hiddenimports += collect_submodules('eventlet')
         "@  | Out-File -FilePath hook-eventlet.py -Encoding utf8
+        
+        # Create hook specifically for dnspython
+        @"
+        from PyInstaller.utils.hooks import collect_submodules
+        
+        hiddenimports = collect_submodules('dns')
+        "@  | Out-File -FilePath hook-dns.py -Encoding utf8
         
     - name: Create empty database for bundling
       run: |
@@ -173,8 +150,16 @@ jobs:
                    --hidden-import=openpyxl.styles `
                    --hidden-import=eventlet `
                    --hidden-import=flask_socketio `
+                   --hidden-import=dns `
+                   --hidden-import=dns.versioned `
+                   --hidden-import=dns.rdtypes `
+                   --hidden-import=dns.rdtypes.ANY `
+                   --hidden-import=dns.rdtypes.CH `
+                   --hidden-import=dns.rdtypes.IN `
                    --collect-all eventlet `
                    --collect-all flask_socketio `
+                   --collect-all dns `
+                   --collect-all dnspython `
                    app.py
                    
     - name: List build output

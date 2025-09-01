@@ -1,59 +1,22 @@
-# Alternative approach: Import eventlet more carefully
+# Simplified version without eventlet for better PyInstaller compatibility
 import sys
 import os
-
-# Pre-import DNS modules before eventlet to avoid conflicts
-try:
-    import dns
-    import dns.versioned
-    import dns.rdtypes
-    import dns.rdtypes.ANY
-    import dns.rdtypes.CH  
-    import dns.rdtypes.IN
-    import dns.resolver
-    import dns.query
-    import dns.zone
-    import dns.reversename
-except ImportError as e:
-    print(f"Warning: DNS module import failed: {e}")
-
-# Now import eventlet with monkey patching
-try:
-    import eventlet
-    import eventlet.hubs.epolls
-    import eventlet.hubs.kqueue
-    import eventlet.hubs.poll
-    import eventlet.hubs.selects
-    eventlet.monkey_patch()
-except ImportError as e:
-    print(f"Warning: Eventlet import failed: {e}")
-    # Fallback: don't use eventlet
-    eventlet = None
-
-from flask import Flask, render_template, request, redirect, send_file, jsonify
-
-# Conditional SocketIO import based on eventlet availability
-if eventlet:
-    from flask_socketio import SocketIO
-else:
-    # Create a mock SocketIO class for fallback
-    class MockSocketIO:
-        def __init__(self, app, **kwargs):
-            self.app = app
-            
-        def emit(self, event, data):
-            print(f"Mock emit: {event} - {data}")
-            
-        def run(self, app, **kwargs):
-            app.run(**kwargs)
-    
-    SocketIO = MockSocketIO
-
 import sqlite3
 from datetime import datetime
 import random
 import logging
-from rs485_reader import get_live_power_and_factor_and_rpm
+import shutil
+
+from flask import Flask, render_template, request, redirect, send_file, jsonify
+from flask_socketio import SocketIO
+
+# Import RS485 module
+try:
+    from rs485_reader import get_live_power_and_factor_and_rpm
+except ImportError:
+    # Create a mock function for testing
+    def get_live_power_and_factor_and_rpm():
+        return 100.0, 0.85, 1450
 
 def resource_path(rel):
     try:
@@ -61,8 +24,6 @@ def resource_path(rel):
     except Exception:
         base = os.path.abspath(".")
     return os.path.join(base, rel)
-
-import shutil
 
 def ensure_writable_db():
     # Use current working directory for the database
@@ -92,11 +53,8 @@ app = Flask(
     static_folder=resource_path("static"),
 )
 
-# Initialize SocketIO with appropriate async mode
-if eventlet:
-    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
-else:
-    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+# Use threading mode for better PyInstaller compatibility
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -365,9 +323,9 @@ def scan():
 
     scan_data = insert_scan(qr_code, power=power, rpm=rpm, power_factor=power_factor, failure_code=failure_code)
     if scan_data:
-        stats = get_stats()  # 👈 get updated numbers
-        socketio.emit('new_scan', {**scan_data, **stats})  # emit to all clients
-        return jsonify({'success': True, 'data': scan_data, 'stats': stats})  # 👈 include stats in response
+        stats = get_stats()
+        socketio.emit('new_scan', {**scan_data, **stats})
+        return jsonify({'success': True, 'data': scan_data, 'stats': stats})
     else:
         return jsonify({'error': 'Failed to insert scan'}), 500
 
@@ -455,7 +413,7 @@ def export():
     except Exception as e:
         print(f"Error in export: {str(e)}")
         return jsonify({'error': 'Export failed'}), 500
-    
+
 @app.route('/undo', methods=['POST'])
 def undo():
     try:
@@ -519,10 +477,8 @@ def manage_models():
         models = cur.fetchall()
 
         # Fetch scan data and stats for dashboard
-        from datetime import datetime
         selected_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
         
-        # Re-use your existing get_scans function or implement below
         scans = get_scans(selected_date)
 
         # Calculate stats
@@ -537,7 +493,6 @@ def manage_models():
         today_passed = len([scan for scan in scans if scan['timestamp'].startswith(selected_date) and scan['status'] == 'PASS'])
         today_failed = today_total - today_passed
 
-    # Render the main dashboard template with full context data
     return render_template('index.html', 
                            scans=scans,
                            selected_date=selected_date,
@@ -557,7 +512,6 @@ def update_failure_code():
     try:
         with get_db() as conn:
             cur = conn.cursor()
-            # Update the most recent failed scan for this QR code with empty failure_code
             cur.execute("""
                 UPDATE scans
                 SET failure_code = ?
@@ -588,7 +542,6 @@ def voice_recognition():
     try:
         with get_db() as conn:
             cur = conn.cursor()
-            # Only update the settings table, not existing scans
             cur.execute("""
                 INSERT OR REPLACE INTO settings (key, value)
                 VALUES ('default_voice_recognition', ?)
@@ -608,13 +561,11 @@ def edit_last_scan():
     try:
         with get_db() as conn:
             cur = conn.cursor()
-            # Get last scan's ID
             cur.execute("SELECT id FROM scans ORDER BY id DESC LIMIT 1")
             last_scan = cur.fetchone()
             if not last_scan:
                 return jsonify({'error': 'No scans found'}), 404
             scan_id = last_scan['id']
-            # Update failure_code and result for last scan
             cur.execute("""
                 UPDATE scans
                 SET failure_code = ?, result = ?
@@ -646,7 +597,6 @@ def update_result():
     try:
         with get_db() as conn:
             cur = conn.cursor()
-            # Update the most recent scan
             cur.execute("""
                 UPDATE scans
                 SET result = ?
@@ -670,7 +620,6 @@ def update_failure_code_and_result():
 
         with get_db() as conn:
             cur = conn.cursor()
-            # First, verify if the last scan exists and is a failure
             cur.execute("""
                 SELECT id FROM scans 
                 WHERE status = 'FAIL' 
@@ -681,7 +630,6 @@ def update_failure_code_and_result():
             if not last_scan:
                 return jsonify({'error': 'No failed scan found'}), 404
 
-            # Update both failure code and result
             cur.execute("""
                 UPDATE scans 
                 SET failure_code = ?, result = ?
@@ -690,7 +638,6 @@ def update_failure_code_and_result():
             
             conn.commit()
 
-            # Verify the update
             if cur.rowcount == 0:
                 return jsonify({'error': 'Update failed'}), 500
 
@@ -714,7 +661,7 @@ def clear_scans():
     try:
         with get_db() as conn:
             cur = conn.cursor()
-            cur.execute("DELETE FROM scans")  # clears only scan logs
+            cur.execute("DELETE FROM scans")
             conn.commit()
         return jsonify({'success': True, 'message': 'All scan logs cleared successfully.'})
     except Exception as e:
@@ -723,5 +670,6 @@ def clear_scans():
 
 if __name__ == '__main__':
     init_db()
-    print(">>> Flask-SocketIO async_mode:", socketio.async_mode)  # debug print
+    print(">>> Running with SocketIO (threading mode)")
+    print(">>> Flask-SocketIO async_mode:", socketio.async_mode)
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)

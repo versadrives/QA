@@ -24,13 +24,26 @@ def resource_path(rel):
 import shutil
 
 def ensure_writable_db():
-    target_path = os.path.join(os.path.abspath("."), "scan_log.db")  # or user folder
+    # Use current working directory for the database
+    target_path = os.path.join(os.path.abspath("."), "scan_log.db")
+    
+    # If database doesn't exist in current directory, try to copy from resources
     if not os.path.exists(target_path):
-        shutil.copy(resource_path("scan_log.db"), target_path)
+        source_path = resource_path("scan_log.db")
+        if os.path.exists(source_path):
+            try:
+                shutil.copy(source_path, target_path)
+                print(f"Database copied from {source_path} to {target_path}")
+            except Exception as e:
+                print(f"Could not copy database: {e}")
+                # If copy fails, we'll create a new database when init_db() runs
+        else:
+            print(f"Source database not found at {source_path}, will create new one")
+    
     return target_path
 
+# Set the database file path once and use it consistently
 DB_FILE = ensure_writable_db()
-
 
 app = Flask(
     __name__,
@@ -40,14 +53,14 @@ app = Flask(
 
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-
-DB_FILE = resource_path("scan_log.db")
-
+# Remove this line - it was overriding your writable database path!
+# DB_FILE = resource_path("scan_log.db")
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 def init_db():
+    print(f"Initializing database at: {DB_FILE}")
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
 
@@ -80,7 +93,6 @@ def init_db():
     )
 """)
 
-
     # ✅ Create settings table if not exists
     c.execute("""
     CREATE TABLE IF NOT EXISTS settings (
@@ -97,7 +109,7 @@ def init_db():
 
     conn.commit()
     conn.close()
-
+    print("Database initialized successfully")
 
 def get_db():
     conn = sqlite3.connect(DB_FILE)
@@ -212,7 +224,6 @@ def get_stats():
         "second_passed": second_passed,
         "rework": rework
     }
-
 
 def get_scans(date=None):
     try:
@@ -403,8 +414,6 @@ def export():
         print(f"Error in export: {str(e)}")
         return jsonify({'error': 'Export failed'}), 500
     
-    
-
 @app.route('/undo', methods=['POST'])
 def undo():
     try:
@@ -496,8 +505,6 @@ def manage_models():
                            today_passed=today_passed,
                            today_failed=today_failed)
 
-
-
 @app.route('/update_failure_code', methods=['POST'])
 def update_failure_code():
     qr_code = request.form.get('qr_code', '').strip()
@@ -588,7 +595,6 @@ def last_scan():
             return jsonify(dict(scan))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
 
 @app.route('/update_result', methods=['POST'])
 def update_result():
@@ -651,6 +657,7 @@ def update_failure_code_and_result():
     except Exception as e:
         print(f"Error in update_failure_code_and_result: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
 @app.route('/defaults')
 def defaults():
     with get_db() as conn:
@@ -671,7 +678,6 @@ def clear_scans():
     except Exception as e:
         print(f"Error clearing scans: {str(e)}")
         return jsonify({'error': 'Failed to clear scans'}), 500
-
 
 if __name__ == '__main__':
     init_db()

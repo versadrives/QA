@@ -1,4 +1,5 @@
 name: Build, Test, and Release Windows EXE
+
 on:
   push:
     branches: [main, master]
@@ -9,6 +10,7 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
     - name: Checkout repo
       uses: actions/checkout@v4
@@ -52,125 +54,125 @@ jobs:
           echo "No tests directory found, skipping tests"
         }
       continue-on-error: true
-        
+
+    - name: Add comprehensive PyInstaller hook for eventlet and dnspython
+      run: |
+        echo "hiddenimports = [" > hook-eventlet.py
+        echo "    'eventlet.hubs.epolls'," >> hook-eventlet.py
+        echo "    'eventlet.hubs.kqueue'," >> hook-eventlet.py
+        echo "    'eventlet.hubs.poll'," >> hook-eventlet.py
+        echo "    'eventlet.hubs.selects'," >> hook-eventlet.py
+        echo "    'dns.asyncquery'," >> hook-eventlet.py
+        echo "    'dns.asyncbackend'," >> hook-eventlet.py
+        echo "    'dns.asyncresolver'," >> hook-eventlet.py
+        echo "    'dns.dnssec'," >> hook-eventlet.py
+        echo "    'dns.e164'," >> hook-eventlet.py
+        echo "    'dns.namedict'," >> hook-eventlet.py
+        echo "    'dns.tsigkeyring'," >> hook-eventlet.py
+        echo "    'dns.versioned'," >> hook-eventlet.py
+        echo "    'dns.rdtypes.ANY'," >> hook-eventlet.py
+        echo "    'dns.rdtypes.CH'," >> hook-eventlet.py
+        echo "    'dns.rdtypes.IN'," >> hook-eventlet.py
+        echo "    'dns.rdtypes.dnskeybase'," >> hook-eventlet.py
+        echo "    'dns.message'," >> hook-eventlet.py
+        echo "    'dns.name'," >> hook-eventlet.py
+        echo "    'dns.rdatatype'," >> hook-eventlet.py
+        echo "    'dns.rdataclass'," >> hook-eventlet.py
+        echo "    'dns.exception'," >> hook-eventlet.py
+        echo "    'dns.flags'," >> hook-eventlet.py
+        echo "    'dns.opcode'," >> hook-eventlet.py
+        echo "    'dns.rcode'," >> hook-eventlet.py
+        echo "    'dns.rrset'," >> hook-eventlet.py
+        echo "    'dns.resolver'" >> hook-eventlet.py
+        echo "]" >> hook-eventlet.py
+
     - name: Create improved PyInstaller spec file
       run: |
         @"
-        # -*- mode: python ; coding: utf-8 -*-
-        import sys
-        import os
-        from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+# -*- mode: python ; coding: utf-8 -*-
+import sys
+import os
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+block_cipher = None
+datas = []
+if os.path.exists('templates'):
+    for root, dirs, files in os.walk('templates'):
+        for file in files:
+            file_path = os.path.join(root, file)
+            arc_path = os.path.relpath(file_path, '.')
+            datas.append((file_path, os.path.dirname(arc_path)))
+if os.path.exists('static'):
+    for root, dirs, files in os.walk('static'):
+        for file in files:
+            file_path = os.path.join(root, file)
+            arc_path = os.path.relpath(file_path, '.')
+            datas.append((file_path, os.path.dirname(arc_path)))
+if os.path.exists('scan_log.db'):
+    datas.append(('scan_log.db', '.'))
+print('Data files to include:', datas)
+hiddenimports = [
+    'flask', 'flask_socketio', 'socketio', 'engineio', 'openpyxl',
+    'openpyxl.styles', 'openpyxl.styles.alignment', 'openpyxl.styles.fonts',
+    'sqlite3', 'threading', 'json', 'datetime', 'random', 'logging', 'shutil',
+    'traceback', 'time', 'signal', 'werkzeug.security', 'jinja2', 'markupsafe',
+    'itsdangerous', 'click', 'blinker'
+]
+try:
+    hiddenimports.extend(collect_submodules('flask_socketio'))
+    hiddenimports.extend(collect_submodules('socketio'))
+    hiddenimports.extend(collect_submodules('engineio'))
+except:
+    pass
+try:
+    import hook-eventlet
+    hiddenimports.extend(hook-eventlet.hiddenimports)
+except Exception as e:
+    print('Failed to import hook-eventlet:', e)
+a = Analysis(
+    ['app.py'],
+    pathex=['.'],
+    binaries=[],
+    datas=datas,
+    hiddenimports=hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=['tkinter', 'matplotlib', 'numpy', 'pandas'],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    [],
+    name='ScanLogApp',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=None,
+)
+"@ | Out-File -FilePath "app.spec" -Encoding utf8
 
-        block_cipher = None
-
-        # Collect all template and static files
-        datas = []
-        
-        # Add templates directory
-        if os.path.exists('templates'):
-            for root, dirs, files in os.walk('templates'):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    arc_path = os.path.relpath(file_path, '.')
-                    datas.append((file_path, os.path.dirname(arc_path)))
-        
-        # Add static directory  
-        if os.path.exists('static'):
-            for root, dirs, files in os.walk('static'):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    arc_path = os.path.relpath(file_path, '.')
-                    datas.append((file_path, os.path.dirname(arc_path)))
-        
-        # Add database file if it exists
-        if os.path.exists('scan_log.db'):
-            datas.append(('scan_log.db', '.'))
-
-        print("Data files to include:", datas)
-
-        # Hidden imports for Flask and dependencies
-        hiddenimports = [
-            'flask',
-            'flask_socketio',
-            'socketio',
-            'engineio',
-            'openpyxl',
-            'openpyxl.styles',
-            'openpyxl.styles.alignment',
-            'openpyxl.styles.fonts',
-            'sqlite3',
-            'threading',
-            'json',
-            'datetime',
-            'random',
-            'logging',
-            'shutil',
-            'traceback',
-            'time',
-            'signal',
-            'werkzeug.security',
-            'jinja2',
-            'markupsafe',
-            'itsdangerous',
-            'click',
-            'blinker'
-        ]
-
-        # Collect submodules
-        try:
-            hiddenimports.extend(collect_submodules('flask_socketio'))
-            hiddenimports.extend(collect_submodules('socketio'))
-            hiddenimports.extend(collect_submodules('engineio'))
-        except:
-            pass
-
-        a = Analysis(
-            ['app.py'],
-            pathex=['.'],
-            binaries=[],
-            datas=datas,
-            hiddenimports=hiddenimports,
-            hookspath=[],
-            hooksconfig={},
-            runtime_hooks=[],
-            excludes=['tkinter', 'matplotlib', 'numpy', 'pandas'],
-            win_no_prefer_redirects=False,
-            win_private_assemblies=False,
-            cipher=block_cipher,
-            noarchive=False,
-        )
-
-        pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
-        exe = EXE(
-            pyz,
-            a.scripts,
-            a.binaries,
-            a.zipfiles,
-            a.datas,
-            [],
-            name='ScanLogApp',
-            debug=False,
-            bootloader_ignore_signals=False,
-            strip=False,
-            upx=True,
-            upx_exclude=[],
-            runtime_tmpdir=None,
-            console=True,
-            disable_windowed_traceback=False,
-            argv_emulation=False,
-            target_arch=None,
-            codesign_identity=None,
-            entitlements_file=None,
-            icon=None,
-        )
-        "@ | Out-File -FilePath "app.spec" -Encoding utf8
-        
     - name: Build executable with PyInstaller
       run: |
         echo "Building with PyInstaller..."
         pyinstaller app.spec --clean --noconfirm --log-level=DEBUG
-        
+
     - name: Verify build output
       run: |
         echo "Contents of dist directory:"
@@ -181,8 +183,6 @@ jobs:
           echo "ERROR: dist directory not found!" 
           exit 1
         }
-        
-        # Check if executable exists
         if (Test-Path "dist/ScanLogApp.exe") {
           $size = (Get-Item "dist/ScanLogApp.exe").Length
           echo "Executable size: $($size / 1MB) MB"
@@ -190,93 +190,123 @@ jobs:
           echo "ERROR: Executable not found!"
           exit 1
         }
-        
+
     - name: Create startup script and documentation
       run: |
-        # Create a batch file to help users run the app
         @"
-        @echo off
-        echo Starting ScanLog Application...
-        echo.
-        echo The application will start a web server on port 5000
-        echo Once started, open your browser and go to: http://localhost:5000
-        echo.
-        echo Press Ctrl+C to stop the application
-        echo ================================================
-        ScanLogApp.exe
-        pause
-        "@ | Out-File -FilePath "StartApp.bat" -Encoding ascii
-        
-        # Create comprehensive README
+@echo off
+echo Starting ScanLog Application...
+echo.
+echo The application will start a web server on port 5000
+echo Once started, open your browser and go to: http://localhost:5000
+echo.
+echo Press Ctrl+C to stop the application
+echo ================================================
+ScanLogApp.exe
+pause
+"@ | Out-File -FilePath "StartApp.bat" -Encoding ascii
+
         @"
-        # ScanLog Application v1.0
-        
-        ## Quick Start
-        1. Double-click 'StartApp.bat' to launch the application
-        2. Wait for "Application ready!" message
-        3. Open your browser and go to http://localhost:5000
-        4. Start scanning QR codes!
-        
-        ## Alternative Start Method
-        - Double-click 'ScanLogApp.exe' directly
-        - A command window will open showing the application status
-        - Do not close this window while using the application
-        
-        ## System Requirements
-        - Windows 10 or later (64-bit)
-        - No additional software installation required
-        - Port 5000 must be available
-        
-        ## Features
-        - QR code scanning and logging
-        - Real-time power monitoring via RS485
-        - Excel export functionality  
-        - Web-based dashboard with real-time updates
-        - Model-based pass/fail criteria
-        - Voice recognition status tracking
-        
-        ## Troubleshooting
-        
-        ### Application won't start:
-        - Make sure port 5000 is not being used by another application
-        - Check Windows Firewall settings
-        - Run as Administrator if needed
-        
-        ### RS485 sensor issues:
-        - The application will use mock data if sensors are not connected
-        - Check your RS485 connection and drivers
-        
-        ### Browser not connecting:
-        - Try http://127.0.0.1:5000 instead of localhost
-        - Clear browser cache and cookies
-        - Try a different browser (Chrome, Firefox, Edge)
-        
-        ### Database issues:
-        - The database file (scan_log.db) is created automatically
-        - Make sure the application folder has write permissions
-        
-        ## Data Location
-        - Database: scan_log.db (in the same folder as the executable)
-        - Excel exports: Documents folder
-        
-        ## Support
-        For technical support, please contact the development team.
-        
-        Build Information:
-        - Built on: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
-        - Python Version: 3.11
-        - Flask Version: Latest
-        
-        ## Version History
-        v1.0 - Initial release with core functionality
-        "@ | Out-File -FilePath "README.txt" -Encoding utf8
-        
+# ScanLog Application v1.0
+
+## Quick Start
+1. Double-click 'StartApp.bat' to launch the application
+2. Wait for "Application ready!" message
+3. Open your browser and go to http://localhost:5000
+4. Start scanning QR codes!
+
+## Alternative Start Method
+- Double-click 'ScanLogApp.exe' directly
+- A command window will open showing the application status
+- Do not close this window while using the application
+
+## System Requirements
+- Windows 10 or later (64-bit)
+- No additional software installation required
+- Port 5000 must be available
+
+## Features
+- QR code scanning and logging
+- Real-time power monitoring via RS485
+- Excel export functionality  
+- Web-based dashboard with real-time updates
+- Model-based pass/fail criteria
+- Voice recognition status tracking
+
+## Troubleshooting
+
+### Application won't start:
+- Make sure port 5000 is not being used by another application
+- Check Windows Firewall settings
+- Run as Administrator if needed
+
+### RS485 sensor issues:
+- The application will use mock data if sensors are not connected
+- Check your RS485 connection and drivers
+
+### Browser not connecting:
+- Try [http://127.0.0.1:5000](http://127.0.0.1:5000) instead of localhost
+- Clear browser cache and cookies
+- Try a different browser (Chrome, Firefox, Edge)
+
+### Database issues:
+- The database file (scan_log.db) is created automatically
+- Make sure the application folder has write permissions
+
+## Data Location
+- Database: scan_log.db (in the same folder as the executable)
+- Excel exports: Documents folder
+
+## Support
+For technical support, please contact the development team.
+
+Build Information:
+- Built on: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
+- Python Version: 3.11
+- Flask Version: Latest
+
+## Version History
+v1.0 - Initial release with core functionality
+"@ | Out-File -FilePath "README.txt" -Encoding utf8
+
     - name: Test executable startup
       run: |
         echo "Testing executable startup..."
-        
-        # Test that the executable starts without immediate crash
-        $process = Start-Process -FilePath "dist/ScanLogApp.exe" -PassThru -NoNewWindow -RedirectStandardOutput "output.log" -RedirectStandardError "error.log"
-        
-        # Wait a bit for startup
-        Start-Sleep
+        Start-Process -FilePath "dist/ScanLogApp.exe" -PassThru -NoNewWindow
+        Start-Sleep -Seconds 5
+        $proc = Get-Process ScanLogApp -ErrorAction SilentlyContinue
+        if ($null -eq $proc) {
+          echo "Executable did not start or crashed immediately!"
+          exit 1
+        } else {
+          echo "Executable started successfully and is running."
+          Stop-Process -Id $proc.Id -Force
+        }
+        echo "Startup test complete."
+
+    - name: Upload EXE artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ScanLogApp
+        path: |
+          dist/ScanLogApp.exe
+          StartApp.bat
+          README.txt
+
+  release:
+    runs-on: windows-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+    - name: Download EXE artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: ScanLogApp
+        path: ./artifact
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ./artifact/**
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

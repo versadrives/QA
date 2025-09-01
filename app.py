@@ -1,179 +1,89 @@
-# Fixed version for PyInstaller compatibility
-import sys
-import os
+from flask import Flask, render_template, request, redirect, send_file, jsonify
+from flask_socketio import SocketIO
 import sqlite3
 from datetime import datetime
 import random
+import os, sys
 import logging
-import shutil
-import traceback
-import time
-import signal
+from rs485_reader import get_live_power_and_factor_and_rpm
 
-# Add error handling for imports
-try:
-    from flask import Flask, render_template, request, redirect, send_file, jsonify
-    from flask_socketio import SocketIO
-except ImportError as e:
-    print(f"Failed to import Flask modules: {e}")
-    input("Press Enter to exit...")
-    sys.exit(1)
-
-# Import RS485 module with better error handling
-try:
-    from rs485_reader import get_live_power_and_factor_and_rpm
-    print("RS485 module imported successfully")
-except ImportError as e:
-    print(f"RS485 module not found: {e}")
-    print("Using mock function for testing")
-    def get_live_power_and_factor_and_rpm():
-        """Mock function for testing when RS485 module is not available"""
-        import random
-        return round(random.uniform(80, 120), 1), round(random.uniform(0.8, 0.95), 2), random.randint(1400, 1500)
-
-def resource_path(relative_path):
-    """Get absolute path to resource, works for dev and for PyInstaller"""
+def resource_path(rel):
     try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-        print(f"Running from PyInstaller bundle: {base_path}")
+        base = sys._MEIPASS  # created by PyInstaller when frozen
     except Exception:
-        base_path = os.path.abspath(".")
-        print(f"Running from source: {base_path}")
-    
-    full_path = os.path.join(base_path, relative_path)
-    print(f"Resource path for '{relative_path}': {full_path}")
-    return full_path
+        base = os.path.abspath(".")
+    return os.path.join(base, rel)
 
-def ensure_writable_db():
-    """Ensure database is in a writable location"""
-    # For PyInstaller, use the directory where the exe is located
-    if getattr(sys, 'frozen', False):
-        # Running as executable
-        exe_dir = os.path.dirname(sys.executable)
-        target_path = os.path.join(exe_dir, "scan_log.db")
-        print(f"Executable mode: Database will be at {target_path}")
-    else:
-        # Running from source
-        target_path = os.path.join(os.path.abspath("."), "scan_log.db")
-        print(f"Source mode: Database will be at {target_path}")
-    
-    # If database doesn't exist, try to copy from resources
-    if not os.path.exists(target_path):
-        source_path = resource_path("scan_log.db")
-        if os.path.exists(source_path) and source_path != target_path:
-            try:
-                shutil.copy(source_path, target_path)
-                print(f"Database copied from {source_path} to {target_path}")
-            except Exception as e:
-                print(f"Could not copy database: {e}")
-        else:
-            print(f"Source database not found or same as target, will create new one")
-    else:
-        print(f"Database already exists at {target_path}")
-    
-    return target_path
+app = Flask(
+    __name__,
+    template_folder=resource_path("templates"),
+    static_folder=resource_path("static"),
+)
 
-def create_flask_app():
-    """Create and configure Flask app"""
-    try:
-        # Check if templates directory exists
-        template_dir = resource_path("templates")
-        static_dir = resource_path("static")
-        
-        print(f"Template directory: {template_dir} (exists: {os.path.exists(template_dir)})")
-        print(f"Static directory: {static_dir} (exists: {os.path.exists(static_dir)})")
-        
-        # Create Flask app with proper paths
-        app = Flask(
-            __name__,
-            template_folder=template_dir if os.path.exists(template_dir) else None,
-            static_folder=static_dir if os.path.exists(static_dir) else None,
-        )
-        
-        # Configure app
-        app.config['SECRET_KEY'] = 'your-secret-key-here'
-        
-        return app
-    except Exception as e:
-        print(f"Failed to create Flask app: {e}")
-        traceback.print_exc()
-        raise
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Global variables
-DB_FILE = None
-app = None
-socketio = None
+DB_FILE = "scan_log.db"
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 def init_db():
-    """Initialize database with error handling"""
-    global DB_FILE
-    try:
-        print(f"Initializing database at: {DB_FILE}")
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
 
-        # Create scans table
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS scans (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            daily_number INTEGER NOT NULL,
-            qr_code TEXT NOT NULL,
-            power REAL NOT NULL,
-            rpm INTEGER NOT NULL,
-            power_factor REAL NOT NULL,
-            failure_code TEXT NOT NULL,
-            status TEXT NOT NULL,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            result TEXT DEFAULT 'FP OK',
-            voice_recognition TEXT DEFAULT 'NA'
-        )
-        """)
-        
-        # Create models table to store specs per model
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS models (
-            model_prefix TEXT PRIMARY KEY,
-            power_min REAL,
-            power_max REAL,
-            pf_min REAL,
-            rpm_min INTEGER,
-            rpm_max INTEGER
-        )
-        """)
+    # Create scans table
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS scans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        daily_number INTEGER NOT NULL,
+        qr_code TEXT NOT NULL,
+        power REAL NOT NULL,
+        rpm INTEGER NOT NULL,
+        power_factor REAL NOT NULL,
+        failure_code TEXT NOT NULL,
+        status TEXT NOT NULL,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        result TEXT DEFAULT 'FP OK',
+        voice_recognition TEXT DEFAULT 'NA'
+    )
+    """)
+    
+    # ✅ Create models table to store specs per model
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS models (
+        model_prefix TEXT PRIMARY KEY,
+        power_min REAL,
+        power_max REAL,
+        pf_min REAL,
+        rpm_min INTEGER,
+        rpm_max INTEGER
+    )
+""")
 
-        # Create settings table if not exists
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS settings (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        )
-        """)
 
-        # Insert default voice recognition setting if not exists
-        c.execute("""
-        INSERT OR IGNORE INTO settings (key, value)
-        VALUES ('default_voice_recognition', 'NA')
-        """)
+    # ✅ Create settings table if not exists
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+    )
+    """)
 
-        conn.commit()
-        conn.close()
-        print("Database initialized successfully")
-        return True
-    except Exception as e:
-        print(f"Database initialization failed: {e}")
-        traceback.print_exc()
-        return False
+    # ✅ Insert default voice recognition setting if not exists
+    c.execute("""
+    INSERT OR IGNORE INTO settings (key, value)
+    VALUES ('default_voice_recognition', 'NA')
+    """)
+
+    conn.commit()
+    conn.close()
+
 
 def get_db():
-    """Get database connection with error handling"""
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        conn.row_factory = sqlite3.Row
-        return conn
-    except Exception as e:
-        print(f"Database connection failed: {e}")
-        raise
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
 def insert_scan(qr_code, power=None, rpm=None, power_factor=None, failure_code='NA', result=None):
     try:
         # Get current voice recognition setting for new scan
@@ -283,6 +193,7 @@ def get_stats():
         "rework": rework
     }
 
+
 def get_scans(date=None):
     try:
         with get_db() as conn:
@@ -381,9 +292,9 @@ def scan():
 
     scan_data = insert_scan(qr_code, power=power, rpm=rpm, power_factor=power_factor, failure_code=failure_code)
     if scan_data:
-        stats = get_stats()
-        socketio.emit('new_scan', {**scan_data, **stats})
-        return jsonify({'success': True, 'data': scan_data, 'stats': stats})
+        stats = get_stats()  # 👈 get updated numbers
+        socketio.emit('new_scan', {**scan_data, **stats})  # emit to all clients
+        return jsonify({'success': True, 'data': scan_data, 'stats': stats})  # 👈 include stats in response
     else:
         return jsonify({'error': 'Failed to insert scan'}), 500
 
@@ -471,6 +382,8 @@ def export():
     except Exception as e:
         print(f"Error in export: {str(e)}")
         return jsonify({'error': 'Export failed'}), 500
+    
+    
 
 @app.route('/undo', methods=['POST'])
 def undo():
@@ -535,8 +448,10 @@ def manage_models():
         models = cur.fetchall()
 
         # Fetch scan data and stats for dashboard
+        from datetime import datetime
         selected_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
         
+        # Re-use your existing get_scans function or implement below
         scans = get_scans(selected_date)
 
         # Calculate stats
@@ -551,6 +466,7 @@ def manage_models():
         today_passed = len([scan for scan in scans if scan['timestamp'].startswith(selected_date) and scan['status'] == 'PASS'])
         today_failed = today_total - today_passed
 
+    # Render the main dashboard template with full context data
     return render_template('index.html', 
                            scans=scans,
                            selected_date=selected_date,
@@ -559,6 +475,8 @@ def manage_models():
                            today_total=today_total,
                            today_passed=today_passed,
                            today_failed=today_failed)
+
+
 
 @app.route('/update_failure_code', methods=['POST'])
 def update_failure_code():
@@ -570,6 +488,7 @@ def update_failure_code():
     try:
         with get_db() as conn:
             cur = conn.cursor()
+            # Update the most recent failed scan for this QR code with empty failure_code
             cur.execute("""
                 UPDATE scans
                 SET failure_code = ?
@@ -600,6 +519,7 @@ def voice_recognition():
     try:
         with get_db() as conn:
             cur = conn.cursor()
+            # Only update the settings table, not existing scans
             cur.execute("""
                 INSERT OR REPLACE INTO settings (key, value)
                 VALUES ('default_voice_recognition', ?)
@@ -619,11 +539,13 @@ def edit_last_scan():
     try:
         with get_db() as conn:
             cur = conn.cursor()
+            # Get last scan's ID
             cur.execute("SELECT id FROM scans ORDER BY id DESC LIMIT 1")
             last_scan = cur.fetchone()
             if not last_scan:
                 return jsonify({'error': 'No scans found'}), 404
             scan_id = last_scan['id']
+            # Update failure_code and result for last scan
             cur.execute("""
                 UPDATE scans
                 SET failure_code = ?, result = ?
@@ -646,6 +568,7 @@ def last_scan():
             return jsonify(dict(scan))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
 
 @app.route('/update_result', methods=['POST'])
 def update_result():
@@ -655,6 +578,7 @@ def update_result():
     try:
         with get_db() as conn:
             cur = conn.cursor()
+            # Update the most recent scan
             cur.execute("""
                 UPDATE scans
                 SET result = ?
@@ -678,6 +602,7 @@ def update_failure_code_and_result():
 
         with get_db() as conn:
             cur = conn.cursor()
+            # First, verify if the last scan exists and is a failure
             cur.execute("""
                 SELECT id FROM scans 
                 WHERE status = 'FAIL' 
@@ -688,6 +613,7 @@ def update_failure_code_and_result():
             if not last_scan:
                 return jsonify({'error': 'No failed scan found'}), 404
 
+            # Update both failure code and result
             cur.execute("""
                 UPDATE scans 
                 SET failure_code = ?, result = ?
@@ -696,6 +622,7 @@ def update_failure_code_and_result():
             
             conn.commit()
 
+            # Verify the update
             if cur.rowcount == 0:
                 return jsonify({'error': 'Update failed'}), 500
 
@@ -704,7 +631,6 @@ def update_failure_code_and_result():
     except Exception as e:
         print(f"Error in update_failure_code_and_result: {str(e)}")
         return jsonify({'error': str(e)}), 500
-
 @app.route('/defaults')
 def defaults():
     with get_db() as conn:
@@ -719,73 +645,15 @@ def clear_scans():
     try:
         with get_db() as conn:
             cur = conn.cursor()
-            cur.execute("DELETE FROM scans")
+            cur.execute("DELETE FROM scans")  # clears only scan logs
             conn.commit()
         return jsonify({'success': True, 'message': 'All scan logs cleared successfully.'})
     except Exception as e:
         print(f"Error clearing scans: {str(e)}")
         return jsonify({'error': 'Failed to clear scans'}), 500
 
-def signal_handler(signum, frame):
-    """Handle shutdown signals gracefully"""
-    print(f"\nReceived signal {signum}. Shutting down gracefully...")
-    sys.exit(0)
-
-def main():
-    """Main function with comprehensive error handling"""
-    global DB_FILE, app, socketio
-    
-    # Set up signal handlers
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-    
-    try:
-        print("=" * 50)
-        print("ScanLog Application Starting...")
-        print("=" * 50)
-        
-        # Initialize database
-        print("Step 1: Setting up database...")
-        DB_FILE = ensure_writable_db()
-        if not init_db():
-            raise Exception("Database initialization failed")
-        
-        # Create Flask app
-        print("Step 2: Creating Flask application...")
-        app = create_flask_app()
-        
-        # Create SocketIO instance
-        print("Step 3: Setting up SocketIO...")
-        socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
-        
-        # Setup routes
-        print("Step 4: Setting up routes...")
-        setup_routes()
-        
-        # Test sensor connection
-        print("Step 5: Testing sensor connection...")
-        try:
-            power, pf, rpm = get_live_power_and_factor_and_rpm()
-            print(f"Sensor test: Power={power}, PF={pf}, RPM={rpm}")
-        except Exception as e:
-            print(f"Sensor test failed (using mock data): {e}")
-        
-        print("=" * 50)
-        print("Application ready!")
-        print("Open your browser and go to: http://localhost:5000")
-        print("Press Ctrl+C to stop the application")
-        print("=" * 50)
-        
-        # Start the server
-        socketio.run(app, host='0.0.0.0', port=5000, debug=False)
-        
-    except KeyboardInterrupt:
-        print("\nApplication stopped by user")
-    except Exception as e:
-        print(f"FATAL ERROR: {e}")
-        traceback.print_exc()
-        input("\nPress Enter to exit...")
-        sys.exit(1)
 
 if __name__ == '__main__':
-    main()
+    init_db()
+    print(">>> Flask-SocketIO async_mode:", socketio.async_mode)  # debug print
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)

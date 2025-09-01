@@ -17,6 +17,7 @@ hiddenimports = [
     'dns.rdtypes.dnskeybase',
     'dns.message',
     'dns.name',
+    'dns.namedict',
     'dns.rdatatype',
     'dns.rdataclass',
     'dns.exception',
@@ -25,6 +26,4 @@ hiddenimports = [
     'dns.rcode',
     'dns.rrset',
     'dns.resolver'
-    'dns.namedict'
 ]
-

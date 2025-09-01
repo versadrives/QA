@@ -1,16 +1,57 @@
-import eventlet
-import eventlet.hubs.epolls
-import eventlet.hubs.kqueue
-import eventlet.hubs.poll
-import eventlet.hubs.selects
-eventlet.monkey_patch()
+# Alternative approach: Import eventlet more carefully
+import sys
+import os
+
+# Pre-import DNS modules before eventlet to avoid conflicts
+try:
+    import dns
+    import dns.versioned
+    import dns.rdtypes
+    import dns.rdtypes.ANY
+    import dns.rdtypes.CH  
+    import dns.rdtypes.IN
+    import dns.resolver
+    import dns.query
+    import dns.zone
+    import dns.reversename
+except ImportError as e:
+    print(f"Warning: DNS module import failed: {e}")
+
+# Now import eventlet with monkey patching
+try:
+    import eventlet
+    import eventlet.hubs.epolls
+    import eventlet.hubs.kqueue
+    import eventlet.hubs.poll
+    import eventlet.hubs.selects
+    eventlet.monkey_patch()
+except ImportError as e:
+    print(f"Warning: Eventlet import failed: {e}")
+    # Fallback: don't use eventlet
+    eventlet = None
 
 from flask import Flask, render_template, request, redirect, send_file, jsonify
-from flask_socketio import SocketIO
+
+# Conditional SocketIO import based on eventlet availability
+if eventlet:
+    from flask_socketio import SocketIO
+else:
+    # Create a mock SocketIO class for fallback
+    class MockSocketIO:
+        def __init__(self, app, **kwargs):
+            self.app = app
+            
+        def emit(self, event, data):
+            print(f"Mock emit: {event} - {data}")
+            
+        def run(self, app, **kwargs):
+            app.run(**kwargs)
+    
+    SocketIO = MockSocketIO
+
 import sqlite3
 from datetime import datetime
 import random
-import os, sys
 import logging
 from rs485_reader import get_live_power_and_factor_and_rpm
 
@@ -51,10 +92,11 @@ app = Flask(
     static_folder=resource_path("static"),
 )
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
-
-# Remove this line - it was overriding your writable database path!
-# DB_FILE = resource_path("scan_log.db")
+# Initialize SocketIO with appropriate async mode
+if eventlet:
+    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+else:
+    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -81,7 +123,7 @@ def init_db():
     )
     """)
     
-    # ✅ Create models table to store specs per model
+    # Create models table to store specs per model
     c.execute("""
     CREATE TABLE IF NOT EXISTS models (
         model_prefix TEXT PRIMARY KEY,
@@ -93,7 +135,7 @@ def init_db():
     )
 """)
 
-    # ✅ Create settings table if not exists
+    # Create settings table if not exists
     c.execute("""
     CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
@@ -101,7 +143,7 @@ def init_db():
     )
     """)
 
-    # ✅ Insert default voice recognition setting if not exists
+    # Insert default voice recognition setting if not exists
     c.execute("""
     INSERT OR IGNORE INTO settings (key, value)
     VALUES ('default_voice_recognition', 'NA')

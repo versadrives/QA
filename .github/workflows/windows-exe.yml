@@ -59,6 +59,7 @@ jobs:
         echo "    'dns.rdtypes.dnskeybase'," >> hook-eventlet.py
         echo "    'dns.message'," >> hook-eventlet.py
         echo "    'dns.name'," >> hook-eventlet.py
+        echo "    'dns.namedict'," >> hook-eventlet.py
         echo "    'dns.rdatatype'," >> hook-eventlet.py
         echo "    'dns.rdataclass'," >> hook-eventlet.py
         echo "    'dns.exception'," >> hook-eventlet.py
@@ -67,8 +68,8 @@ jobs:
         echo "    'dns.rcode'," >> hook-eventlet.py
         echo "    'dns.rrset'," >> hook-eventlet.py
         echo "    'dns.resolver'" >> hook-eventlet.py
-        echo "    'dns.namedict'" >> hook-eventlet.py
         echo "]" >> hook-eventlet.py
+
 
     - name: Build executable with PyInstaller
       run: pyinstaller --additional-hooks-dir=. --name QA_Testing_App --onefile --noconsole --add-data "scan_log.db;." --add-data "templates;templates" --add-data "static;static" app.py

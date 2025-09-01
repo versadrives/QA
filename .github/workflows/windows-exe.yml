@@ -28,7 +28,18 @@ jobs:
       run: |
         echo "Current directory: $(pwd)"
         dir
-        if (Test-Path tests) { dir tests }
+        if (Test-Path templates) { 
+          echo "Templates directory contents:"
+          dir templates 
+        }
+        if (Test-Path static) { 
+          echo "Static directory contents:"
+          dir static 
+        }
+        if (Test-Path tests) { 
+          echo "Tests directory contents:"
+          dir tests 
+        }
         
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=$(pwd)" >> $env:GITHUB_ENV
@@ -42,7 +53,7 @@ jobs:
         }
       continue-on-error: true
         
-    - name: Create PyInstaller spec file
+    - name: Create improved PyInstaller spec file
       run: |
         @"
         # -*- mode: python ; coding: utf-8 -*-
@@ -54,19 +65,64 @@ jobs:
 
         # Collect all template and static files
         datas = []
+        
+        # Add templates directory
         if os.path.exists('templates'):
-            datas.extend(collect_data_files('.', include_py_files=False, subdir='templates'))
+            for root, dirs, files in os.walk('templates'):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arc_path = os.path.relpath(file_path, '.')
+                    datas.append((file_path, os.path.dirname(arc_path)))
+        
+        # Add static directory  
         if os.path.exists('static'):
-            datas.extend(collect_data_files('.', include_py_files=False, subdir='static'))
+            for root, dirs, files in os.walk('static'):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arc_path = os.path.relpath(file_path, '.')
+                    datas.append((file_path, os.path.dirname(arc_path)))
+        
+        # Add database file if it exists
         if os.path.exists('scan_log.db'):
             datas.append(('scan_log.db', '.'))
 
-        # Collect Flask-SocketIO and eventlet modules
-        hiddenimports = []
-        hiddenimports.extend(collect_submodules('flask_socketio'))
-        hiddenimports.extend(collect_submodules('socketio'))
-        hiddenimports.extend(collect_submodules('engineio'))
-        hiddenimports.extend(['openpyxl', 'openpyxl.styles', 'threading'])
+        print("Data files to include:", datas)
+
+        # Hidden imports for Flask and dependencies
+        hiddenimports = [
+            'flask',
+            'flask_socketio',
+            'socketio',
+            'engineio',
+            'openpyxl',
+            'openpyxl.styles',
+            'openpyxl.styles.alignment',
+            'openpyxl.styles.fonts',
+            'sqlite3',
+            'threading',
+            'json',
+            'datetime',
+            'random',
+            'logging',
+            'shutil',
+            'traceback',
+            'time',
+            'signal',
+            'werkzeug.security',
+            'jinja2',
+            'markupsafe',
+            'itsdangerous',
+            'click',
+            'blinker'
+        ]
+
+        # Collect submodules
+        try:
+            hiddenimports.extend(collect_submodules('flask_socketio'))
+            hiddenimports.extend(collect_submodules('socketio'))
+            hiddenimports.extend(collect_submodules('engineio'))
+        except:
+            pass
 
         a = Analysis(
             ['app.py'],
@@ -77,7 +133,7 @@ jobs:
             hookspath=[],
             hooksconfig={},
             runtime_hooks=[],
-            excludes=[],
+            excludes=['tkinter', 'matplotlib', 'numpy', 'pandas'],
             win_no_prefer_redirects=False,
             win_private_assemblies=False,
             cipher=block_cipher,
@@ -106,105 +162,121 @@ jobs:
             target_arch=None,
             codesign_identity=None,
             entitlements_file=None,
+            icon=None,
         )
         "@ | Out-File -FilePath "app.spec" -Encoding utf8
         
     - name: Build executable with PyInstaller
       run: |
-        pyinstaller app.spec --clean --noconfirm
+        echo "Building with PyInstaller..."
+        pyinstaller app.spec --clean --noconfirm --log-level=DEBUG
         
     - name: Verify build output
       run: |
         echo "Contents of dist directory:"
         if (Test-Path dist) { 
           dir dist -Recurse 
+          echo "Build successful!"
         } else { 
-          echo "dist directory not found!" 
+          echo "ERROR: dist directory not found!" 
           exit 1
         }
         
-    - name: Test executable
-      run: |
+        # Check if executable exists
         if (Test-Path "dist/ScanLogApp.exe") {
-          echo "Executable found: dist/ScanLogApp.exe"
-          # Quick test - just check if it starts (timeout after 5 seconds)
-          Start-Process -FilePath "dist/ScanLogApp.exe" -PassThru | ForEach-Object { 
-            Start-Sleep 5; 
-            if (!$_.HasExited) { 
-              $_.Kill() 
-              echo "Executable started successfully and was terminated"
-            }
-          }
+          $size = (Get-Item "dist/ScanLogApp.exe").Length
+          echo "Executable size: $($size / 1MB) MB"
         } else {
-          echo "Executable not found!"
+          echo "ERROR: Executable not found!"
           exit 1
         }
         
-    - name: Create release package
+    - name: Create startup script and documentation
       run: |
-        # Create a release directory
-        New-Item -ItemType Directory -Path "release" -Force
-        
-        # Copy the executable
-        Copy-Item "dist/ScanLogApp.exe" "release/"
-        
-        # Create README for the release
+        # Create a batch file to help users run the app
         @"
-        # ScanLog Application
+        @echo off
+        echo Starting ScanLog Application...
+        echo.
+        echo The application will start a web server on port 5000
+        echo Once started, open your browser and go to: http://localhost:5000
+        echo.
+        echo Press Ctrl+C to stop the application
+        echo ================================================
+        ScanLogApp.exe
+        pause
+        "@ | Out-File -FilePath "StartApp.bat" -Encoding ascii
         
-        ## Installation
-        1. Download the ScanLogApp.exe file
-        2. Run the executable directly - no installation required
+        # Create comprehensive README
+        @"
+        # ScanLog Application v1.0
         
-        ## Usage
-        1. Double-click ScanLogApp.exe to start the application
-        2. The application will start a web server on port 5000
+        ## Quick Start
+        1. Double-click 'StartApp.bat' to launch the application
+        2. Wait for "Application ready!" message
         3. Open your browser and go to http://localhost:5000
+        4. Start scanning QR codes!
         
-        ## Requirements
-        - Windows 10 or later
+        ## Alternative Start Method
+        - Double-click 'ScanLogApp.exe' directly
+        - A command window will open showing the application status
+        - Do not close this window while using the application
+        
+        ## System Requirements
+        - Windows 10 or later (64-bit)
         - No additional software installation required
+        - Port 5000 must be available
         
         ## Features
         - QR code scanning and logging
         - Real-time power monitoring via RS485
         - Excel export functionality  
-        - Web-based dashboard
+        - Web-based dashboard with real-time updates
+        - Model-based pass/fail criteria
+        - Voice recognition status tracking
         
-        Built on: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
-        Python Version: 3.11
-        "@ | Out-File -FilePath "release/README.txt" -Encoding utf8
+        ## Troubleshooting
         
-        # Show what we're packaging
-        echo "Release package contents:"
-        dir release
+        ### Application won't start:
+        - Make sure port 5000 is not being used by another application
+        - Check Windows Firewall settings
+        - Run as Administrator if needed
         
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: ScanLogApp-Windows-${{ github.sha }}
-        path: release/
-        retention-days: 30
+        ### RS485 sensor issues:
+        - The application will use mock data if sensors are not connected
+        - Check your RS485 connection and drivers
         
-    - name: Create ZIP for release
+        ### Browser not connecting:
+        - Try http://127.0.0.1:5000 instead of localhost
+        - Clear browser cache and cookies
+        - Try a different browser (Chrome, Firefox, Edge)
+        
+        ### Database issues:
+        - The database file (scan_log.db) is created automatically
+        - Make sure the application folder has write permissions
+        
+        ## Data Location
+        - Database: scan_log.db (in the same folder as the executable)
+        - Excel exports: Documents folder
+        
+        ## Support
+        For technical support, please contact the development team.
+        
+        Build Information:
+        - Built on: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
+        - Python Version: 3.11
+        - Flask Version: Latest
+        
+        ## Version History
+        v1.0 - Initial release with core functionality
+        "@ | Out-File -FilePath "README.txt" -Encoding utf8
+        
+    - name: Test executable startup
       run: |
-        Compress-Archive -Path "release/*" -DestinationPath "ScanLogApp-Windows.zip"
+        echo "Testing executable startup..."
         
-    - name: Upload ZIP artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ScanLogApp-Windows-ZIP
-        path: ScanLogApp-Windows.zip
-        retention-days: 90
+        # Test that the executable starts without immediate crash
+        $process = Start-Process -FilePath "dist/ScanLogApp.exe" -PassThru -NoNewWindow -RedirectStandardOutput "output.log" -RedirectStandardError "error.log"
         
-    # Only run this step on releases
-    - name: Upload to release
-      if: github.event_name == 'release'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./ScanLogApp-Windows.zip
-        asset_name: ScanLogApp-Windows-${{ github.event.release.tag_name }}.zip
-        asset_content_type: application/zip
+        # Wait a bit for startup
+        Start-Sleep
